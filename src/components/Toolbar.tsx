@@ -1,0 +1,105 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+import { activeFilterCount, toSearchParams, type FilterState } from "@/lib/filters";
+
+import FilterPanel from "./FilterPanel";
+import { buttonClass, inputClass, primaryButtonClass } from "./ui";
+
+export type ToolbarProps = {
+  filters: FilterState;
+  onChange: (next: FilterState) => void;
+  onAdd: () => void;
+  refreshing: boolean;
+};
+
+export default function Toolbar({ filters, onChange, onAdd, refreshing }: ToolbarProps) {
+  // The input is uncontrolled-ish: it echoes keystrokes instantly and only pushes to
+  // the URL after a pause, so typing never waits on a round trip.
+  const [text, setText] = useState(filters.q);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const activeCount = activeFilterCount(filters);
+
+  // When the URL's `q` changes from somewhere other than this box (back button, a
+  // cleared filter), pull the box back in line. Adjusting state during render rather
+  // than in an effect avoids the extra render pass — the pattern React documents for
+  // "a prop changed and some state derived from it must reset".
+  const [lastQ, setLastQ] = useState(filters.q);
+  if (filters.q !== lastQ) {
+    setLastQ(filters.q);
+    setText(filters.q);
+  }
+
+  useEffect(() => {
+    if (text === filters.q) return;
+    const id = setTimeout(() => onChange({ ...filters, q: text }), 250);
+    return () => clearTimeout(id);
+  }, [text, filters, onChange]);
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setPanelOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPanelOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [panelOpen]);
+
+  const exportHref = `/api/applications/export?${toSearchParams(filters).toString()}`;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative min-w-0 flex-1">
+        <input
+          type="search"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Search company, role, notes, location…"
+          aria-label="Search applications"
+          className={`${inputClass} pr-16`}
+        />
+        {refreshing ? (
+          <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-zinc-500">…</span>
+        ) : null}
+      </div>
+
+      <div className="relative" ref={wrapRef}>
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          aria-expanded={panelOpen}
+          className={buttonClass}
+        >
+          Filter
+          {activeCount ? (
+            <span className="rounded-full bg-sky-500/20 px-1.5 text-xs font-semibold text-sky-300 tabular-nums">
+              {activeCount}
+            </span>
+          ) : null}
+        </button>
+        {panelOpen ? (
+          <FilterPanel filters={filters} onChange={onChange} onClose={() => setPanelOpen(false)} />
+        ) : null}
+      </div>
+
+      {/* A plain link so the browser handles the download and the CSV inherits the
+          current filters straight from the URL. */}
+      <a href={exportHref} className={buttonClass} download>
+        Export
+      </a>
+
+      <button type="button" onClick={onAdd} className={primaryButtonClass}>
+        + Add
+      </button>
+    </div>
+  );
+}
