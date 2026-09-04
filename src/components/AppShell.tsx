@@ -148,6 +148,34 @@ export default function AppShell({
     setEditing(undefined);
   }, []);
 
+  // One-click "Apply" from the table row: opens the posting (the caller does that
+  // synchronously, before this resolves, so popup blockers don't eat it) and moves
+  // the application out of Saved. Reuses onSaved so the row merges the same way an
+  // edit from the modal would.
+  const onQuickApply = useCallback(
+    (app: Application) => {
+      fetch(`/api/applications/${app._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Applied" }),
+      })
+        .then(async (res) => {
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error ?? "Could not update application");
+          return json.application as Application;
+        })
+        .then((updated) => {
+          const merge = (list: Application[]) => list.map((a) => (a._id === updated._id ? updated : a));
+          setApps(merge);
+          setAllApps(merge);
+        })
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : "Could not update application");
+        });
+    },
+    [],
+  );
+
   return (
     <main className="mx-auto w-full max-w-7xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
@@ -184,6 +212,7 @@ export default function AppShell({
         now={now}
         onSort={onSort}
         onOpen={(a) => setEditing(a._id)}
+        onApply={onQuickApply}
       />
 
       {modalOpen ? (
