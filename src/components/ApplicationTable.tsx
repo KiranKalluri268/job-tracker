@@ -15,8 +15,8 @@ const COLUMNS: { key: SortKey | null; label: string; className?: string }[] = [
   { key: "nextActionOn", label: "Next action" },
   { key: null, label: "Source" },
   { key: "updatedAt", label: "Updated" },
+  { key: null, label: "Actions" },
 ];
-
 
 function StaleBadge({ days }: { days: number }) {
   return (
@@ -34,16 +34,47 @@ function DueBadge() {
   );
 }
 
+/**
+ * Opens the posting (if there is one) and marks the application Applied in one
+ * click. Stops propagation so it doesn't also trigger the row's onOpen (which
+ * would pop the edit modal on top of the new tab).
+ */
+function ApplyButton({ app, onApply }: { app: Application; onApply: (app: Application) => void }) {
+  if (app.status !== "Saved") return null;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (app.postingUrl) window.open(app.postingUrl, "_blank", "noopener,noreferrer");
+        onApply(app);
+      }}
+      className="inline-flex items-center rounded-lg bg-sky-500 px-2.5 py-1 text-xs font-semibold text-sky-950 transition hover:bg-sky-400"
+    >
+      Apply
+    </button>
+  );
+}
+
 export type TableProps = {
   applications: Application[];
   sort: SortKey;
   dir: "asc" | "desc";
   onSort: (key: SortKey) => void;
   onOpen: (app: Application) => void;
+  onApply: (app: Application) => void;
   now: Date;
 };
 
-export default function ApplicationTable({ applications, sort, dir, onSort, onOpen, now }: TableProps) {
+export default function ApplicationTable({
+  applications,
+  sort,
+  dir,
+  onSort,
+  onOpen,
+  onApply,
+  now,
+}: TableProps) {
   if (!applications.length) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--color-edge)] px-6 py-16 text-center">
@@ -129,6 +160,9 @@ export default function ApplicationTable({ applications, sort, dir, onSort, onOp
                   </td>
                   <td className="px-4 py-3 text-zinc-400">{a.source ?? "—"}</td>
                   <td className="px-4 py-3 text-zinc-500">{shortDate(a.updatedAt)}</td>
+                  <td className="px-4 py-3">
+                    <ApplyButton app={a} onApply={onApply} />
+                  </td>
                 </tr>
               );
             })}
@@ -159,6 +193,11 @@ export default function ApplicationTable({ applications, sort, dir, onSort, onOp
                 {isStale(a, now) ? <StaleBadge days={quietDays(a, now)} /> : null}
               </div>
             </button>
+            {a.status === "Saved" ? (
+              <div className="mt-1.5 flex justify-end">
+                <ApplyButton app={a} onApply={onApply} />
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>
