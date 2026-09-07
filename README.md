@@ -2,7 +2,7 @@
 
 A private tracker for job applications: one table with search, filters, and a
 click-to-edit modal, plus follow-up reminders and pipeline stats. Next.js on Vercel,
-MongoDB Atlas for storage, Google sign-in locked to a single email.
+MongoDB Atlas for storage, Google sign-in locked to an allowlist of accounts.
 
 ## What it does
 
@@ -53,9 +53,9 @@ cp .env.local.example .env.local
 npx auth secret          # writes AUTH_SECRET
 ```
 
-Fill in `MONGODB_URI`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `ALLOWED_EMAIL`
-(comma-separated if you ever want a second address). An empty `ALLOWED_EMAIL` locks
-everyone out — it deliberately does not fail open.
+Fill in `MONGODB_URI`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `ALLOWED_EMAILS`
+(a comma-separated list of every Google account that should be able to sign in). An
+empty `ALLOWED_EMAILS` locks everyone out — it deliberately does not fail open.
 
 ```bash
 npm install
@@ -67,6 +67,9 @@ npm run dev              # http://localhost:3000
 Push to GitHub, import the repo on Vercel, paste the same six env vars into
 **Settings → Environment Variables**, deploy, then add the production callback URL to
 the Google client from step 2.
+
+To add or remove who can sign in later, edit `ALLOWED_EMAILS` in **Settings →
+Environment Variables** and redeploy — no code change needed.
 
 ## Scripts
 
@@ -84,7 +87,7 @@ src/lib/        filters.ts, stats.ts, stale.ts, csv.ts — pure, unit-tested log
                 mongodb.ts (pooled client), serialize.ts (validation + shaping)
 src/app/api/    applications CRUD + CSV export
 src/components/ AppShell owns URL state; the rest are presentational
-src/auth.ts     NextAuth config — the single-email allowlist
+src/auth.ts     NextAuth config — the email allowlist
 src/proxy.ts    route protection
 ```
 
