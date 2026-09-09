@@ -13,6 +13,7 @@ export function makeApp(overrides: Partial<Application> = {}): Application {
     company: `Company ${seq}`,
     role: "Engineer",
     status,
+    starred: false,
     appliedOn: null,
     nextActionOn: null,
     nextActionNote: null,

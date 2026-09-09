@@ -31,6 +31,7 @@ export type Application = {
   company: string;
   role: string;
   status: Status;
+  starred: boolean;
   appliedOn: string | null;
   nextActionOn: string | null;
   nextActionNote: string | null;

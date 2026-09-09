@@ -176,6 +176,37 @@ export default function AppShell({
     [],
   );
 
+  // Star/unstar straight from the table. Optimistic: flip the row now, reconcile
+  // with the server response, and roll back on failure.
+  const onToggleStar = useCallback((app: Application) => {
+    const next = !app.starred;
+    const setStar = (value: boolean) => (list: Application[]) =>
+      list.map((a) => (a._id === app._id ? { ...a, starred: value } : a));
+    setApps(setStar(next));
+    setAllApps(setStar(next));
+
+    fetch(`/api/applications/${app._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ starred: next }),
+    })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Could not update application");
+        return json.application as Application;
+      })
+      .then((updated) => {
+        const merge = (list: Application[]) => list.map((a) => (a._id === updated._id ? updated : a));
+        setApps(merge);
+        setAllApps(merge);
+      })
+      .catch((err: unknown) => {
+        setApps(setStar(app.starred));
+        setAllApps(setStar(app.starred));
+        setError(err instanceof Error ? err.message : "Could not update application");
+      });
+  }, []);
+
   return (
     <main className="mx-auto w-full max-w-7xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
@@ -213,6 +244,7 @@ export default function AppShell({
         onSort={onSort}
         onOpen={(a) => setEditing(a._id)}
         onApply={onQuickApply}
+        onToggleStar={onToggleStar}
       />
 
       {modalOpen ? (

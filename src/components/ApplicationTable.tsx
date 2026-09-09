@@ -8,6 +8,7 @@ import type { Application } from "@/lib/types";
 import { StatusPill } from "./ui";
 
 const COLUMNS: { key: SortKey | null; label: string; className?: string }[] = [
+  { key: null, label: "" },
   { key: "company", label: "Company" },
   { key: null, label: "Role" },
   { key: "status", label: "Status" },
@@ -56,6 +57,35 @@ function ApplyButton({ app, onApply }: { app: Application; onApply: (app: Applic
   );
 }
 
+/**
+ * Toggles the application's starred flag. Stops propagation so it doesn't also
+ * open the edit modal via the row's onClick.
+ */
+function StarButton({
+  app,
+  onToggleStar,
+}: {
+  app: Application;
+  onToggleStar: (app: Application) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={app.starred}
+      aria-label={app.starred ? "Unstar application" : "Star application"}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggleStar(app);
+      }}
+      className={`text-base leading-none transition ${
+        app.starred ? "text-amber-400 hover:text-amber-300" : "text-zinc-600 hover:text-zinc-400"
+      }`}
+    >
+      {app.starred ? "★" : "☆"}
+    </button>
+  );
+}
+
 export type TableProps = {
   applications: Application[];
   sort: SortKey;
@@ -63,6 +93,7 @@ export type TableProps = {
   onSort: (key: SortKey) => void;
   onOpen: (app: Application) => void;
   onApply: (app: Application) => void;
+  onToggleStar: (app: Application) => void;
   now: Date;
 };
 
@@ -73,6 +104,7 @@ export default function ApplicationTable({
   onSort,
   onOpen,
   onApply,
+  onToggleStar,
   now,
 }: TableProps) {
   if (!applications.length) {
@@ -133,6 +165,9 @@ export default function ApplicationTable({
                   }}
                   className="cursor-pointer border-b border-[var(--color-edge)] transition last:border-0 hover:bg-white/[0.03] focus:bg-white/[0.05] focus:outline-none"
                 >
+                  <td className="w-10 px-4 py-3 text-center">
+                    <StarButton app={a} onToggleStar={onToggleStar} />
+                  </td>
                   <td className="px-4 py-3 font-medium text-zinc-100">
                     <div className="flex items-center gap-2">
                       {a.company}
@@ -193,11 +228,10 @@ export default function ApplicationTable({
                 {isStale(a, now) ? <StaleBadge days={quietDays(a, now)} /> : null}
               </div>
             </button>
-            {a.status === "Saved" ? (
-              <div className="mt-1.5 flex justify-end">
-                <ApplyButton app={a} onApply={onApply} />
-              </div>
-            ) : null}
+            <div className="mt-1.5 flex items-center justify-between">
+              <StarButton app={a} onToggleStar={onToggleStar} />
+              <ApplyButton app={a} onApply={onApply} />
+            </div>
           </li>
         ))}
       </ul>

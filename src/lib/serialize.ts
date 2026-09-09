@@ -55,6 +55,7 @@ export function sanitizeInput(body: unknown, { requireCore }: { requireCore: boo
     if (field in raw) out[field] = cleanDate(raw[field]);
   }
   if ("coverLetter" in raw) out.coverLetter = Boolean(raw.coverLetter);
+  if ("starred" in raw) out.starred = Boolean(raw.starred);
   if ("status" in raw) {
     if (!isStatus(raw.status)) throw new ValidationError(`Unknown status "${String(raw.status)}"`);
     out.status = raw.status;
@@ -87,6 +88,7 @@ export function newDocument(input: ApplicationInput, now = new Date()): Record<s
     company: input.company,
     role: input.role,
     status,
+    starred: input.starred ?? false,
     appliedOn,
     nextActionOn: input.nextActionOn ?? null,
     nextActionNote: input.nextActionNote ?? null,
@@ -114,5 +116,10 @@ export function toObjectId(id: string): ObjectId {
 /** Convert a stored document into the JSON shape the client expects. */
 export function serialize(doc: Record<string, unknown>): Application {
   const { _id, ...rest } = doc;
-  return { ...(rest as Omit<Application, "_id">), _id: String(_id) };
+  return {
+    ...(rest as Omit<Application, "_id">),
+    _id: String(_id),
+    // Older documents predate this field; treat a missing value as unstarred.
+    starred: Boolean(rest.starred),
+  };
 }
