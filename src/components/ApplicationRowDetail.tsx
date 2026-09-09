@@ -359,7 +359,7 @@ export default function ApplicationRowDetail({
                 DASH
               )}
             </Cell>
-            <Cell label="Updated">{shortDate(application.updatedAt)}</Cell>
+            <Cell label="Created">{shortDate(application.createdAt)}</Cell>
             <div className="sm:col-span-2 lg:col-span-3">
               <Cell label="Notes">{application.notes ?? DASH}</Cell>
             </div>

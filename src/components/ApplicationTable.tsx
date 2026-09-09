@@ -19,7 +19,7 @@ const COLUMNS: { key: SortKey | null; label: string; className?: string }[] = [
   { key: "appliedOn", label: "Applied" },
   { key: "nextActionOn", label: "Next action" },
   { key: null, label: "Source" },
-  { key: "updatedAt", label: "Updated" },
+  { key: "createdAt", label: "Created" },
   { key: null, label: "Actions" },
 ];
 
@@ -241,7 +241,7 @@ export default function ApplicationTable({
             ) : null}
           </td>
           <td className="px-4 py-3 text-stone-500">{a.source ?? "—"}</td>
-          <td className="px-4 py-3 text-stone-500">{shortDate(a.updatedAt)}</td>
+          <td className="px-4 py-3 text-stone-500">{shortDate(a.createdAt)}</td>
           <td className="px-4 py-3">
             <ApplyButton app={a} onApply={onApply} />
           </td>
