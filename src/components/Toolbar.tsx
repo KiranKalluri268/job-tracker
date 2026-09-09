@@ -68,7 +68,7 @@ export default function Toolbar({ filters, onChange, onAdd, refreshing }: Toolba
           className={`${inputClass} pr-16`}
         />
         {refreshing ? (
-          <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-zinc-500">…</span>
+          <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-stone-500">…</span>
         ) : null}
       </div>
 
@@ -81,7 +81,7 @@ export default function Toolbar({ filters, onChange, onAdd, refreshing }: Toolba
         >
           Filter
           {activeCount ? (
-            <span className="rounded-full bg-sky-500/20 px-1.5 text-xs font-semibold text-sky-300 tabular-nums">
+            <span className="rounded-full bg-indigo-500/20 px-1.5 text-xs font-semibold text-indigo-700 tabular-nums">
               {activeCount}
             </span>
           ) : null}

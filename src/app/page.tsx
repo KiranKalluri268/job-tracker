@@ -60,7 +60,7 @@ function SignOutButton() {
         await signOut({ redirectTo: "/signin" });
       }}
     >
-      <button type="submit" className="underline-offset-2 hover:text-zinc-300 hover:underline">
+      <button type="submit" className="underline-offset-2 hover:text-stone-600 hover:underline">
         Sign out
       </button>
     </form>

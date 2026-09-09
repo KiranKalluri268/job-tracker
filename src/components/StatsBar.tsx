@@ -16,22 +16,22 @@ function WeeklyBars({ weeks }: { weeks: { weekStart: string; label: string; coun
 
   return (
     <div>
-      <p className="text-xs font-medium tracking-wide text-zinc-400 uppercase">Sent per week</p>
+      <p className="text-xs font-medium tracking-wide text-stone-500 uppercase">Sent per week</p>
       <div className="mt-3 flex h-24 items-end gap-1.5 border-b border-[var(--color-edge)] pb-0">
         {weeks.map((w) => (
           <div key={w.weekStart} className="group relative flex flex-1 flex-col justify-end">
             {/* Non-zero weeks keep a visible stub so the baseline reads as a baseline. */}
             <div
-              className="w-full rounded-t bg-sky-500/70 transition group-hover:bg-sky-400"
+              className="w-full rounded-t bg-indigo-500/70 transition group-hover:bg-indigo-500"
               style={{ height: `${w.count === 0 ? 2 : Math.max(6, (w.count / peak) * 84)}px` }}
             />
-            <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-md border border-[var(--color-edge)] bg-[var(--color-panel-2)] px-2 py-1 text-xs whitespace-nowrap text-zinc-200 opacity-0 transition group-hover:opacity-100">
+            <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-md border border-[var(--color-edge)] bg-[var(--color-panel-2)] px-2 py-1 text-xs whitespace-nowrap text-stone-800 opacity-0 transition group-hover:opacity-100">
               {w.count} · week of {w.label}
             </span>
           </div>
         ))}
       </div>
-      <div className="mt-1.5 flex justify-between text-[11px] text-zinc-600">
+      <div className="mt-1.5 flex justify-between text-[11px] text-stone-400">
         <span>{weeks[0]?.label}</span>
         <span>{weeks[weeks.length - 1]?.label}</span>
       </div>
@@ -42,9 +42,9 @@ function WeeklyBars({ weeks }: { weeks: { weekStart: string; label: string; coun
 function Tile({ value, label, hint }: { value: string; label: string; hint?: string }) {
   return (
     <div className="rounded-lg border border-[var(--color-edge)] bg-[var(--color-panel-2)] px-3 py-2.5">
-      <p className="text-xl font-semibold text-zinc-100 tabular-nums">{value}</p>
-      <p className="text-xs text-zinc-400">{label}</p>
-      {hint ? <p className="text-[11px] text-zinc-600">{hint}</p> : null}
+      <p className="text-xl font-semibold text-stone-800 tabular-nums">{value}</p>
+      <p className="text-xs text-stone-500">{label}</p>
+      {hint ? <p className="text-[11px] text-stone-400">{hint}</p> : null}
     </div>
   );
 }
@@ -67,20 +67,20 @@ export default function StatsBar({ applications, onPickStatus, now }: StatsBarPr
         aria-expanded={open}
         className="flex w-full items-center justify-between px-4 py-3 text-left"
       >
-        <span className="text-sm font-semibold text-zinc-200">
+        <span className="text-sm font-semibold text-stone-800">
           Overview
-          <span className="ml-2 font-normal text-zinc-500">
+          <span className="ml-2 font-normal text-stone-500">
             {stats.total} tracked · {stats.sent} sent
           </span>
         </span>
-        <span className="text-xs text-zinc-500">{open ? "Hide" : "Show"}</span>
+        <span className="text-xs text-stone-500">{open ? "Hide" : "Show"}</span>
       </button>
 
       {open ? (
         <div className="grid gap-5 border-t border-[var(--color-edge)] px-4 py-4 lg:grid-cols-[1fr_1.1fr]">
           <div className="space-y-4">
             <div>
-              <p className="text-xs font-medium tracking-wide text-zinc-400 uppercase">
+              <p className="text-xs font-medium tracking-wide text-stone-500 uppercase">
                 Pipeline
                 <span className="ml-2 font-normal normal-case">click to filter</span>
               </p>
@@ -90,7 +90,7 @@ export default function StatsBar({ applications, onPickStatus, now }: StatsBarPr
                     key={s}
                     type="button"
                     onClick={() => onPickStatus(s)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset transition hover:brightness-125 ${STATUS_TONE[s]}`}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset transition hover:brightness-95 ${STATUS_TONE[s]}`}
                   >
                     {s}
                     <span className="tabular-nums opacity-70">{stats.byStatus[s]}</span>

@@ -25,8 +25,8 @@ function Chip({
       aria-pressed={active}
       className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset transition ${
         active
-          ? "bg-sky-500/20 text-sky-200 ring-sky-500/40"
-          : "bg-transparent text-zinc-400 ring-[var(--color-edge)] hover:text-zinc-200"
+          ? "bg-indigo-500/20 text-indigo-800 ring-indigo-500/40"
+          : "bg-transparent text-stone-500 ring-[var(--color-edge)] hover:text-stone-800"
       }`}
     >
       {children}
@@ -47,7 +47,7 @@ export default function FilterPanel({ filters, onChange, onClose }: FilterPanelP
     <div className="absolute top-full right-0 z-40 mt-2 w-[min(92vw,32rem)] rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-4 shadow-2xl">
       <div className="space-y-4">
         <div>
-          <p className="mb-2 text-xs font-medium tracking-wide text-zinc-400 uppercase">Status</p>
+          <p className="mb-2 text-xs font-medium tracking-wide text-stone-500 uppercase">Status</p>
           <div className="flex flex-wrap gap-1.5">
             {STATUSES.map((s) => (
               <Chip
@@ -62,7 +62,7 @@ export default function FilterPanel({ filters, onChange, onClose }: FilterPanelP
         </div>
 
         <div>
-          <p className="mb-2 text-xs font-medium tracking-wide text-zinc-400 uppercase">Work mode</p>
+          <p className="mb-2 text-xs font-medium tracking-wide text-stone-500 uppercase">Work mode</p>
           <div className="flex flex-wrap gap-1.5">
             {WORK_MODES.map((m) => (
               <Chip
@@ -120,10 +120,10 @@ export default function FilterPanel({ filters, onChange, onClose }: FilterPanelP
           </Field>
         </div>
 
-        <label className="flex items-center gap-2.5 text-sm text-zinc-300">
+        <label className="flex items-center gap-2.5 text-sm text-stone-600">
           <input
             type="checkbox"
-            className="size-4 accent-sky-500"
+            className="size-4 accent-indigo-500"
             checked={filters.staleOnly}
             onChange={(e) => patch({ staleOnly: e.target.checked })}
           />

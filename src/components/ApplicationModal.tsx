@@ -142,7 +142,7 @@ export default function ApplicationModal({ application, onClose, onSaved, onDele
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/70 backdrop-blur-sm sm:items-start sm:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-stone-900/30 backdrop-blur-sm sm:items-start sm:p-6"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -152,14 +152,14 @@ export default function ApplicationModal({ application, onClose, onSaved, onDele
         className="w-full max-w-4xl rounded-t-2xl border border-[var(--color-edge)] bg-[var(--color-panel)] shadow-2xl sm:my-6 sm:rounded-2xl"
       >
         <header className="flex items-center justify-between gap-4 border-b border-[var(--color-edge)] px-5 py-4">
-          <h2 className="text-base font-semibold text-zinc-100">
+          <h2 className="text-base font-semibold text-stone-800">
             {isEdit ? `${application.company} — ${application.role}` : "New application"}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-lg px-2 py-1 text-xl leading-none text-zinc-500 hover:bg-white/5 hover:text-zinc-200"
+            className="rounded-lg px-2 py-1 text-xl leading-none text-stone-500 hover:bg-black/5 hover:text-stone-800"
           >
             ×
           </button>
@@ -294,10 +294,10 @@ export default function ApplicationModal({ application, onClose, onSaved, onDele
                 onChange={(e) => set("resumeVersion", e.target.value)}
               />
             </Field>
-            <label className="flex items-center gap-2.5 self-end pb-2.5 text-sm text-zinc-300">
+            <label className="flex items-center gap-2.5 self-end pb-2.5 text-sm text-stone-600">
               <input
                 type="checkbox"
-                className="size-4 accent-sky-500"
+                className="size-4 accent-indigo-500"
                 checked={draft.coverLetter}
                 onChange={(e) => set("coverLetter", e.target.checked)}
               />
@@ -331,17 +331,17 @@ export default function ApplicationModal({ application, onClose, onSaved, onDele
           </div>
 
           <aside className="lg:border-l lg:border-[var(--color-edge)] lg:pl-6">
-            <h3 className="mb-3 text-xs font-medium tracking-wide text-zinc-400 uppercase">Timeline</h3>
+            <h3 className="mb-3 text-xs font-medium tracking-wide text-stone-500 uppercase">Timeline</h3>
             {isEdit ? (
               <Timeline events={application.events} />
             ) : (
-              <p className="text-sm text-zinc-500">History starts once this is saved.</p>
+              <p className="text-sm text-stone-500">History starts once this is saved.</p>
             )}
           </aside>
         </div>
 
         {error ? (
-          <p className="mx-5 mb-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300 ring-1 ring-rose-500/30 ring-inset">
+          <p className="mx-5 mb-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-700 ring-1 ring-rose-500/30 ring-inset">
             {error}
           </p>
         ) : null}
@@ -351,7 +351,7 @@ export default function ApplicationModal({ application, onClose, onSaved, onDele
             {isEdit ? (
               confirmDelete ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-zinc-400">Delete for good?</span>
+                  <span className="text-sm text-stone-500">Delete for good?</span>
                   <button
                     type="button"
                     onClick={remove}
@@ -368,7 +368,7 @@ export default function ApplicationModal({ application, onClose, onSaved, onDele
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
-                  className="rounded-lg px-3 py-2 text-sm text-rose-400 hover:bg-rose-500/10"
+                  className="rounded-lg px-3 py-2 text-sm text-rose-600 hover:bg-rose-500/10"
                 >
                   Delete
                 </button>

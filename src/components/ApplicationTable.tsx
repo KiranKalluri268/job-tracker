@@ -21,7 +21,7 @@ const COLUMNS: { key: SortKey | null; label: string; className?: string }[] = [
 
 function StaleBadge({ days }: { days: number }) {
   return (
-    <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400 ring-1 ring-amber-500/25 ring-inset">
+    <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-500/25 ring-inset">
       quiet {days}d
     </span>
   );
@@ -29,7 +29,7 @@ function StaleBadge({ days }: { days: number }) {
 
 function DueBadge() {
   return (
-    <span className="inline-flex items-center rounded-full bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-400 ring-1 ring-sky-500/25 ring-inset">
+    <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2 py-0.5 text-[11px] font-medium text-indigo-600 ring-1 ring-indigo-500/25 ring-inset">
       due
     </span>
   );
@@ -50,7 +50,7 @@ function ApplyButton({ app, onApply }: { app: Application; onApply: (app: Applic
         if (app.postingUrl) window.open(app.postingUrl, "_blank", "noopener,noreferrer");
         onApply(app);
       }}
-      className="inline-flex items-center rounded-lg bg-sky-500 px-2.5 py-1 text-xs font-semibold text-sky-950 transition hover:bg-sky-400"
+      className="inline-flex items-center rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-indigo-500"
     >
       Apply
     </button>
@@ -78,7 +78,7 @@ function StarButton({
         onToggleStar(app);
       }}
       className={`text-base leading-none transition ${
-        app.starred ? "text-amber-400 hover:text-amber-300" : "text-zinc-600 hover:text-zinc-400"
+        app.starred ? "text-amber-500 hover:text-amber-600" : "text-stone-400 hover:text-stone-500"
       }`}
     >
       {app.starred ? "★" : "☆"}
@@ -110,8 +110,8 @@ export default function ApplicationTable({
   if (!applications.length) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--color-edge)] px-6 py-16 text-center">
-        <p className="text-sm text-zinc-400">Nothing here.</p>
-        <p className="mt-1 text-sm text-zinc-600">
+        <p className="text-sm text-stone-500">Nothing here.</p>
+        <p className="mt-1 text-sm text-stone-400">
           Add an application, or loosen the search and filters.
         </p>
       </div>
@@ -131,13 +131,13 @@ export default function ApplicationTable({
                 <th
                   key={col.label}
                   scope="col"
-                  className="border-b border-[var(--color-edge)] px-4 py-3 text-xs font-semibold tracking-wide text-zinc-400 uppercase"
+                  className="border-b border-[var(--color-edge)] px-4 py-3 text-xs font-semibold tracking-wide text-stone-500 uppercase"
                 >
                   {col.key ? (
                     <button
                       type="button"
                       onClick={() => onSort(col.key as SortKey)}
-                      className="transition hover:text-zinc-200"
+                      className="transition hover:text-stone-800"
                     >
                       {col.label}
                       {arrow(col.key)}
@@ -163,38 +163,38 @@ export default function ApplicationTable({
                       onOpen(a);
                     }
                   }}
-                  className="cursor-pointer border-b border-[var(--color-edge)] transition last:border-0 hover:bg-white/[0.03] focus:bg-white/[0.05] focus:outline-none"
+                  className="cursor-pointer border-b border-[var(--color-edge)] transition last:border-0 hover:bg-black/[0.03] focus:bg-black/[0.04] focus:outline-none"
                 >
                   <td className="w-10 px-4 py-3 text-center">
                     <StarButton app={a} onToggleStar={onToggleStar} />
                   </td>
-                  <td className="px-4 py-3 font-medium text-zinc-100">
+                  <td className="px-4 py-3 font-medium text-stone-800">
                     <div className="flex items-center gap-2">
                       {a.company}
                       {stale ? <StaleBadge days={quietDays(a, now)} /> : null}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-zinc-300">
+                  <td className="px-4 py-3 text-stone-600">
                     {a.role}
-                    {a.location ? <span className="block text-xs text-zinc-500">{a.location}</span> : null}
+                    {a.location ? <span className="block text-xs text-stone-500">{a.location}</span> : null}
                   </td>
                   <td className="px-4 py-3">
                     <StatusPill status={a.status} />
                   </td>
-                  <td className="px-4 py-3 text-zinc-400">{shortDate(a.appliedOn)}</td>
+                  <td className="px-4 py-3 text-stone-500">{shortDate(a.appliedOn)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 text-zinc-400">
+                    <div className="flex items-center gap-2 text-stone-500">
                       {shortDate(a.nextActionOn)}
                       {isActionDue(a, now) ? <DueBadge /> : null}
                     </div>
                     {a.nextActionNote ? (
-                      <span className="block max-w-52 truncate text-xs text-zinc-500">
+                      <span className="block max-w-52 truncate text-xs text-stone-500">
                         {a.nextActionNote}
                       </span>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3 text-zinc-400">{a.source ?? "—"}</td>
-                  <td className="px-4 py-3 text-zinc-500">{shortDate(a.updatedAt)}</td>
+                  <td className="px-4 py-3 text-stone-500">{a.source ?? "—"}</td>
+                  <td className="px-4 py-3 text-stone-500">{shortDate(a.updatedAt)}</td>
                   <td className="px-4 py-3">
                     <ApplyButton app={a} onApply={onApply} />
                   </td>
@@ -212,16 +212,16 @@ export default function ApplicationTable({
             <button
               type="button"
               onClick={() => onOpen(a)}
-              className="w-full rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] px-4 py-3 text-left transition active:bg-white/5"
+              className="w-full rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] px-4 py-3 text-left transition active:bg-black/5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-zinc-100">{a.company}</p>
-                  <p className="truncate text-sm text-zinc-400">{a.role}</p>
+                  <p className="truncate font-medium text-stone-800">{a.company}</p>
+                  <p className="truncate text-sm text-stone-500">{a.role}</p>
                 </div>
                 <StatusPill status={a.status} />
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500">
                 <span>Applied {shortDate(a.appliedOn)}</span>
                 {a.nextActionOn ? <span>· Next {shortDate(a.nextActionOn)}</span> : null}
                 {isActionDue(a, now) ? <DueBadge /> : null}

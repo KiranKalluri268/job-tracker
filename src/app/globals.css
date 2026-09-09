@@ -1,29 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #0b0d10;
-  --color-panel: #14171c;
-  --color-panel-2: #1a1e25;
-  --color-edge: #262b34;
+  /* Warm paper light theme. */
+  --color-ink: #f6f4ef;
+  --color-panel: #fffdf9;
+  --color-panel-2: #faf8f2;
+  --color-edge: #e6e1d6;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
 body {
   background: var(--color-ink);
-  color: #e6e8ec;
+  color: #2b2a26;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-}
-
-/* Native date inputs render a near-black icon on a dark field; invert it back. */
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.75);
-  cursor: pointer;
 }
 
 /* A slim scrollbar so the table's horizontal overflow doesn't eat a row of height. */

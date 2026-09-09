@@ -24,7 +24,7 @@ export default function AttentionStrip({ applications, onOpen, onShowStale, now 
 
   if (!due.length && !stale.length) {
     return (
-      <p className="rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] px-4 py-3 text-sm text-zinc-500">
+      <p className="rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] px-4 py-3 text-sm text-stone-500">
         Nothing needs chasing today.
       </p>
     );
@@ -33,12 +33,12 @@ export default function AttentionStrip({ applications, onOpen, onShowStale, now 
   return (
     <section className="rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] px-4 py-3.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h2 className="text-sm font-semibold text-zinc-200">Needs attention</h2>
+        <h2 className="text-sm font-semibold text-stone-800">Needs attention</h2>
         {stale.length ? (
           <button
             type="button"
             onClick={onShowStale}
-            className="text-xs text-amber-400 underline-offset-2 hover:underline"
+            className="text-xs text-amber-700 underline-offset-2 hover:underline"
           >
             {stale.length} gone quiet →
           </button>
@@ -52,21 +52,21 @@ export default function AttentionStrip({ applications, onOpen, onShowStale, now 
               <button
                 type="button"
                 onClick={() => onOpen(a)}
-                className="flex max-w-72 items-center gap-2 rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-1.5 text-left text-sm text-sky-100 transition hover:border-sky-500/50 hover:bg-sky-500/15"
+                className="flex max-w-72 items-center gap-2 rounded-lg border border-indigo-500/25 bg-indigo-500/10 px-3 py-1.5 text-left text-sm text-indigo-900 transition hover:border-indigo-500/50 hover:bg-indigo-500/15"
               >
                 <span className="truncate font-medium">{a.company}</span>
-                <span className="truncate text-xs text-sky-300/80">
+                <span className="truncate text-xs text-indigo-600/80">
                   {a.nextActionNote ?? "Follow up"}
                 </span>
                 {a.nextActionOn && a.nextActionOn < today ? (
-                  <span className="shrink-0 text-xs text-amber-300">overdue</span>
+                  <span className="shrink-0 text-xs text-amber-700">overdue</span>
                 ) : null}
               </button>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-1.5 text-sm text-zinc-500">No follow-ups scheduled for today.</p>
+        <p className="mt-1.5 text-sm text-stone-500">No follow-ups scheduled for today.</p>
       )}
     </section>
   );

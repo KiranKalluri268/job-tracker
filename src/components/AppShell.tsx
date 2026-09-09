@@ -210,9 +210,9 @@ export default function AppShell({
   return (
     <main className="mx-auto w-full max-w-7xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-lg font-semibold text-zinc-100">Job Tracker</h1>
+        <h1 className="text-lg font-semibold text-stone-800">Job Tracker</h1>
         {userEmail ? (
-          <span className="flex items-center gap-3 text-xs text-zinc-500">
+          <span className="flex items-center gap-3 text-xs text-stone-500">
             {userEmail}
             {signOutSlot}
           </span>
@@ -220,7 +220,7 @@ export default function AppShell({
       </header>
 
       {error ? (
-        <p className="rounded-xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/30 ring-inset">
+        <p className="rounded-xl bg-rose-500/10 px-4 py-3 text-sm text-rose-700 ring-1 ring-rose-500/30 ring-inset">
           {error}
         </p>
       ) : null}
