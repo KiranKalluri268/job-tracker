@@ -5,6 +5,7 @@ export const STATUSES = [
   "Interview",
   "Offer",
   "Rejected",
+  "Not qualified",
   "Ghosted",
 ] as const;
 
@@ -14,10 +15,10 @@ export const WORK_MODES = ["Remote", "Hybrid", "Onsite"] as const;
 export type WorkMode = (typeof WORK_MODES)[number];
 
 /** Statuses that mean the company came back to us in some form. */
-export const RESPONDED: readonly Status[] = ["OA", "Interview", "Offer", "Rejected"];
+export const RESPONDED: readonly Status[] = ["OA", "Interview", "Offer", "Rejected", "Not qualified"];
 
 /** Statuses that mean the application is finished, one way or the other. */
-export const CLOSED: readonly Status[] = ["Offer", "Rejected", "Ghosted"];
+export const CLOSED: readonly Status[] = ["Offer", "Rejected", "Not qualified", "Ghosted"];
 
 export type AppEvent = {
   at: string;
@@ -60,6 +61,7 @@ export const STATUS_TONE: Record<Status, string> = {
   Interview: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
   Offer: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
   Rejected: "bg-rose-500/15 text-rose-300 ring-rose-500/30",
+  "Not qualified": "bg-orange-500/15 text-orange-300 ring-orange-500/30",
   Ghosted: "bg-zinc-500/15 text-zinc-400 ring-zinc-500/30",
 };
 
