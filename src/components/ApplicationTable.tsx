@@ -1,11 +1,15 @@
 "use client";
 
+import { Fragment, useState } from "react";
+
 import { shortDate } from "@/lib/dates";
 import type { SortKey } from "@/lib/filters";
 import { isActionDue, isStale, quietDays } from "@/lib/stale";
-import type { Application } from "@/lib/types";
+import type { Application, Status } from "@/lib/types";
+import { STATUSES } from "@/lib/types";
 
-import { StatusPill } from "./ui";
+import ApplicationRowDetail from "./ApplicationRowDetail";
+import { StatusPill, inputClass } from "./ui";
 
 const COLUMNS: { key: SortKey | null; label: string; className?: string }[] = [
   { key: null, label: "" },
@@ -36,9 +40,62 @@ function DueBadge() {
 }
 
 /**
+ * The status cell: a pill until clicked, then an inline <select> that switches the
+ * status straight away. Every interaction stops propagation so it never expands the
+ * row underneath it.
+ */
+function StatusCell({
+  app,
+  onStatusChange,
+}: {
+  app: Application;
+  onStatusChange: (app: Application, status: Status) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+        aria-label={`Change status, currently ${app.status}`}
+      >
+        <StatusPill status={app.status} />
+      </button>
+    );
+  }
+
+  return (
+    <select
+      autoFocus
+      className={`${inputClass} w-auto py-1`}
+      value={app.status}
+      onClick={(e) => e.stopPropagation()}
+      onBlur={() => setOpen(false)}
+      onChange={(e) => {
+        e.stopPropagation();
+        const next = e.target.value as Status;
+        setOpen(false);
+        if (next !== app.status) onStatusChange(app, next);
+      }}
+    >
+      {STATUSES.map((s) => (
+        <option key={s} value={s}>
+          {s}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
  * Opens the posting (if there is one) and marks the application Applied in one
- * click. Stops propagation so it doesn't also trigger the row's onOpen (which
- * would pop the edit modal on top of the new tab).
+ * click. Stops propagation so it doesn't also toggle the row's expansion (which
+ * would race the new tab).
  */
 function ApplyButton({ app, onApply }: { app: Application; onApply: (app: Application) => void }) {
   if (app.status !== "Saved") return null;
@@ -59,7 +116,7 @@ function ApplyButton({ app, onApply }: { app: Application; onApply: (app: Applic
 
 /**
  * Toggles the application's starred flag. Stops propagation so it doesn't also
- * open the edit modal via the row's onClick.
+ * toggle the row's expansion.
  */
 function StarButton({
   app,
@@ -90,10 +147,14 @@ export type TableProps = {
   applications: Application[];
   sort: SortKey;
   dir: "asc" | "desc";
+  expandedId: string | null;
   onSort: (key: SortKey) => void;
-  onOpen: (app: Application) => void;
+  onToggleExpand: (app: Application) => void;
   onApply: (app: Application) => void;
   onToggleStar: (app: Application) => void;
+  onStatusChange: (app: Application, status: Status) => void;
+  onRowSaved: (app: Application) => void;
+  onRowDeleted: (id: string) => void;
   now: Date;
 };
 
@@ -101,10 +162,14 @@ export default function ApplicationTable({
   applications,
   sort,
   dir,
+  expandedId,
   onSort,
-  onOpen,
+  onToggleExpand,
   onApply,
   onToggleStar,
+  onStatusChange,
+  onRowSaved,
+  onRowDeleted,
   now,
 }: TableProps) {
   if (!applications.length) {
@@ -152,18 +217,21 @@ export default function ApplicationTable({
           <tbody>
             {applications.map((a) => {
               const stale = isStale(a, now);
+              const expanded = expandedId === a._id;
               return (
+                <Fragment key={a._id}>
                 <tr
-                  key={a._id}
                   tabIndex={0}
-                  onClick={() => onOpen(a)}
+                  onClick={() => onToggleExpand(a)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      onOpen(a);
+                      onToggleExpand(a);
                     }
                   }}
-                  className="cursor-pointer border-b border-[var(--color-edge)] transition last:border-0 hover:bg-black/[0.03] focus:bg-black/[0.04] focus:outline-none"
+                  className={`cursor-pointer border-b border-[var(--color-edge)] align-top transition last:border-0 focus:bg-black/[0.04] focus:outline-none ${
+                    expanded ? "bg-black/[0.03]" : "hover:bg-black/[0.03]"
+                  }`}
                 >
                   <td className="w-10 px-4 py-3 text-center">
                     <StarButton app={a} onToggleStar={onToggleStar} />
@@ -179,7 +247,7 @@ export default function ApplicationTable({
                     {a.location ? <span className="block text-xs text-stone-500">{a.location}</span> : null}
                   </td>
                   <td className="px-4 py-3">
-                    <StatusPill status={a.status} />
+                    <StatusCell app={a} onStatusChange={onStatusChange} />
                   </td>
                   <td className="px-4 py-3 text-stone-500">{shortDate(a.appliedOn)}</td>
                   <td className="px-4 py-3">
@@ -199,6 +267,19 @@ export default function ApplicationTable({
                     <ApplyButton app={a} onApply={onApply} />
                   </td>
                 </tr>
+                {expanded ? (
+                  <tr className="border-b border-[var(--color-edge)] last:border-0">
+                    <td colSpan={COLUMNS.length} className="p-0">
+                      <ApplicationRowDetail
+                        application={a}
+                        onSaved={onRowSaved}
+                        onDeleted={onRowDeleted}
+                        onClose={() => onToggleExpand(a)}
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+                </Fragment>
               );
             })}
           </tbody>
@@ -207,33 +288,45 @@ export default function ApplicationTable({
 
       {/* Mobile: the same rows as stacked cards. */}
       <ul className="space-y-2 md:hidden">
-        {applications.map((a) => (
-          <li key={a._id}>
-            <button
-              type="button"
-              onClick={() => onOpen(a)}
-              className="w-full rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] px-4 py-3 text-left transition active:bg-black/5"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-stone-800">{a.company}</p>
-                  <p className="truncate text-sm text-stone-500">{a.role}</p>
+        {applications.map((a) => {
+          const expanded = expandedId === a._id;
+          return (
+            <li key={a._id} className="overflow-hidden rounded-xl border border-[var(--color-edge)]">
+              <button
+                type="button"
+                onClick={() => onToggleExpand(a)}
+                className="w-full bg-[var(--color-panel)] px-4 py-3 text-left transition active:bg-black/5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-stone-800">{a.company}</p>
+                    <p className="truncate text-sm text-stone-500">{a.role}</p>
+                  </div>
+                  <StatusPill status={a.status} />
                 </div>
-                <StatusPill status={a.status} />
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500">
-                <span>Applied {shortDate(a.appliedOn)}</span>
-                {a.nextActionOn ? <span>· Next {shortDate(a.nextActionOn)}</span> : null}
-                {isActionDue(a, now) ? <DueBadge /> : null}
-                {isStale(a, now) ? <StaleBadge days={quietDays(a, now)} /> : null}
-              </div>
-            </button>
-            <div className="mt-1.5 flex items-center justify-between">
-              <StarButton app={a} onToggleStar={onToggleStar} />
-              <ApplyButton app={a} onApply={onApply} />
-            </div>
-          </li>
-        ))}
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                  <span>Applied {shortDate(a.appliedOn)}</span>
+                  {a.nextActionOn ? <span>· Next {shortDate(a.nextActionOn)}</span> : null}
+                  {isActionDue(a, now) ? <DueBadge /> : null}
+                  {isStale(a, now) ? <StaleBadge days={quietDays(a, now)} /> : null}
+                </div>
+              </button>
+              {expanded ? (
+                <ApplicationRowDetail
+                  application={a}
+                  onSaved={onRowSaved}
+                  onDeleted={onRowDeleted}
+                  onClose={() => onToggleExpand(a)}
+                />
+              ) : (
+                <div className="flex items-center justify-between px-4 pb-3">
+                  <StarButton app={a} onToggleStar={onToggleStar} />
+                  <ApplyButton app={a} onApply={onApply} />
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </>
   );

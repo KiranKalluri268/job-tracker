@@ -13,9 +13,6 @@ import StatsBar from "./StatsBar";
 import Toolbar from "./Toolbar";
 import { useNow } from "./useNow";
 
-/** `null` = the create modal; a string = editing that id; `undefined` = closed. */
-type Editing = string | null | undefined;
-
 export type AppShellProps = {
   initialApplications: Application[];
   initialError: string | null;
@@ -53,12 +50,12 @@ export default function AppShell({
   const [allApps, setAllApps] = useState<Application[]>(initialApplications);
   const [error, setError] = useState<string | null>(initialError);
   const [refreshing, setRefreshing] = useState(false);
-  const [editing, setEditing] = useState<Editing>(undefined);
+  // The create form is still a modal; editing an existing row happens inline in the
+  // table, so all the table needs from here is which row is expanded.
+  const [creating, setCreating] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const now = useNow(serverNow);
-
-  const editingApp = editing ? (allApps.find((a) => a._id === editing) ?? null) : null;
-  const modalOpen = editing !== undefined;
 
   // Refetch whenever the URL's filters change. The counter guards against an older
   // request landing after a newer one and clobbering the fresher list.
@@ -125,27 +122,67 @@ export default function AppShell({
     [filters, applyFilters],
   );
 
-  const onSaved = useCallback(
+  const mergeRow = useCallback((saved: Application) => {
+    const merge = (list: Application[]) => {
+      const i = list.findIndex((a) => a._id === saved._id);
+      return i === -1 ? [saved, ...list] : list.map((a) => (a._id === saved._id ? saved : a));
+    };
+    setApps(merge);
+    setAllApps(merge);
+    // The merged row is optimistic — it may no longer match the active filter.
+    // Reconcile against the server rather than leaving a stale row on screen.
+    reloadAll();
+  }, [reloadAll]);
+
+  const onCreated = useCallback(
     (saved: Application) => {
-      const merge = (list: Application[]) => {
-        const i = list.findIndex((a) => a._id === saved._id);
-        return i === -1 ? [saved, ...list] : list.map((a) => (a._id === saved._id ? saved : a));
-      };
-      setApps(merge);
-      setAllApps(merge);
-      setEditing(undefined);
-      // The merged row is optimistic — it may no longer match the active filter.
-      // Reconcile against the server rather than leaving a stale row on screen.
-      reloadAll();
+      mergeRow(saved);
+      setCreating(false);
     },
-    [reloadAll],
+    [mergeRow],
   );
 
   const onDeleted = useCallback((id: string) => {
     const drop = (list: Application[]) => list.filter((a) => a._id !== id);
     setApps(drop);
     setAllApps(drop);
-    setEditing(undefined);
+    setExpandedId((current) => (current === id ? null : current));
+    setCreating(false);
+  }, []);
+
+  const onToggleExpand = useCallback((app: Application) => {
+    setExpandedId((current) => (current === app._id ? null : app._id));
+  }, []);
+
+  // Inline status switch from the table. Optimistic, reconciled against the server
+  // response (which also carries the freshly written timeline entry), rolled back
+  // on failure.
+  const onStatusChange = useCallback((app: Application, status: Status) => {
+    const setStatus = (value: Status) => (list: Application[]) =>
+      list.map((a) => (a._id === app._id ? { ...a, status: value } : a));
+    setApps(setStatus(status));
+    setAllApps(setStatus(status));
+
+    fetch(`/api/applications/${app._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Could not update application");
+        return json.application as Application;
+      })
+      .then((updated) => {
+        const merge = (list: Application[]) => list.map((a) => (a._id === updated._id ? updated : a));
+        setApps(merge);
+        setAllApps(merge);
+      })
+      .catch((err: unknown) => {
+        setApps(setStatus(app.status));
+        setAllApps(setStatus(app.status));
+        setError(err instanceof Error ? err.message : "Could not update application");
+      });
   }, []);
 
   // One-click "Apply" from the table row: opens the posting (the caller does that
@@ -228,30 +265,34 @@ export default function AppShell({
       <AttentionStrip
         applications={allApps}
         now={now}
-        onOpen={(a) => setEditing(a._id)}
+        onOpen={(a) => setExpandedId(a._id)}
         onShowStale={() => applyFilters({ ...filters, staleOnly: true })}
       />
 
       <StatsBar applications={allApps} now={now} onPickStatus={onPickStatus} />
 
-      <Toolbar filters={filters} onChange={applyFilters} onAdd={() => setEditing(null)} refreshing={refreshing} />
+      <Toolbar filters={filters} onChange={applyFilters} onAdd={() => setCreating(true)} refreshing={refreshing} />
 
       <ApplicationTable
         applications={apps}
         sort={filters.sort}
         dir={filters.dir}
+        expandedId={expandedId}
         now={now}
         onSort={onSort}
-        onOpen={(a) => setEditing(a._id)}
+        onToggleExpand={onToggleExpand}
         onApply={onQuickApply}
         onToggleStar={onToggleStar}
+        onStatusChange={onStatusChange}
+        onRowSaved={mergeRow}
+        onRowDeleted={onDeleted}
       />
 
-      {modalOpen ? (
+      {creating ? (
         <ApplicationModal
-          application={editingApp}
-          onClose={() => setEditing(undefined)}
-          onSaved={onSaved}
+          application={null}
+          onClose={() => setCreating(false)}
+          onSaved={onCreated}
           onDeleted={onDeleted}
         />
       ) : null}

@@ -2,75 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { Application, ApplicationInput, Status, WorkMode } from "@/lib/types";
+import type { Application, Status, WorkMode } from "@/lib/types";
 import { STATUSES, WORK_MODES } from "@/lib/types";
 
+import { draftOf, payloadOf, type Draft } from "./applicationDraft";
 import Timeline from "./Timeline";
 import { Field, buttonClass, inputClass, primaryButtonClass } from "./ui";
-
-type Draft = {
-  company: string;
-  role: string;
-  status: Status;
-  appliedOn: string;
-  nextActionOn: string;
-  nextActionNote: string;
-  location: string;
-  workMode: WorkMode | "";
-  source: string;
-  salary: string;
-  postingUrl: string;
-  resumeVersion: string;
-  coverLetter: boolean;
-  contactName: string;
-  contactEmail: string;
-  notes: string;
-};
-
-const BLANK: Draft = {
-  company: "",
-  role: "",
-  status: "Saved",
-  appliedOn: "",
-  nextActionOn: "",
-  nextActionNote: "",
-  location: "",
-  workMode: "",
-  source: "",
-  salary: "",
-  postingUrl: "",
-  resumeVersion: "",
-  coverLetter: false,
-  contactName: "",
-  contactEmail: "",
-  notes: "",
-};
-
-function draftOf(app: Application | null): Draft {
-  if (!app) return BLANK;
-  return {
-    company: app.company,
-    role: app.role,
-    status: app.status,
-    appliedOn: app.appliedOn ?? "",
-    nextActionOn: app.nextActionOn ?? "",
-    nextActionNote: app.nextActionNote ?? "",
-    location: app.location ?? "",
-    workMode: app.workMode ?? "",
-    source: app.source ?? "",
-    salary: app.salary ?? "",
-    postingUrl: app.postingUrl ?? "",
-    resumeVersion: app.resumeVersion ?? "",
-    coverLetter: app.coverLetter,
-    contactName: app.contactName ?? "",
-    contactEmail: app.contactEmail ?? "",
-    notes: app.notes ?? "",
-  };
-}
-
-function payloadOf(d: Draft): ApplicationInput {
-  return { ...d, workMode: d.workMode === "" ? null : d.workMode } as ApplicationInput;
-}
 
 export type ModalProps = {
   /** null means "create a new one". */
