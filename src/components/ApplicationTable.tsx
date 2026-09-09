@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { useState } from "react";
 
 import { shortDate } from "@/lib/dates";
 import type { SortKey } from "@/lib/filters";
@@ -184,6 +184,7 @@ export default function ApplicationTable({
   }
 
   const arrow = (key: SortKey | null) => (key && key === sort ? (dir === "asc" ? " ↑" : " ↓") : "");
+  const expandedApp = expandedId ? (applications.find((a) => a._id === expandedId) ?? null) : null;
 
   return (
     <>
@@ -219,8 +220,8 @@ export default function ApplicationTable({
               const stale = isStale(a, now);
               const expanded = expandedId === a._id;
               return (
-                <Fragment key={a._id}>
                 <tr
+                  key={a._id}
                   tabIndex={0}
                   onClick={() => onToggleExpand(a)}
                   onKeyDown={(e) => {
@@ -267,19 +268,6 @@ export default function ApplicationTable({
                     <ApplyButton app={a} onApply={onApply} />
                   </td>
                 </tr>
-                {expanded ? (
-                  <tr className="border-b border-[var(--color-edge)] last:border-0">
-                    <td colSpan={COLUMNS.length} className="p-0">
-                      <ApplicationRowDetail
-                        application={a}
-                        onSaved={onRowSaved}
-                        onDeleted={onRowDeleted}
-                        onClose={() => onToggleExpand(a)}
-                      />
-                    </td>
-                  </tr>
-                ) : null}
-                </Fragment>
               );
             })}
           </tbody>
@@ -291,7 +279,12 @@ export default function ApplicationTable({
         {applications.map((a) => {
           const expanded = expandedId === a._id;
           return (
-            <li key={a._id} className="overflow-hidden rounded-xl border border-[var(--color-edge)]">
+            <li
+              key={a._id}
+              className={`overflow-hidden rounded-xl border ${
+                expanded ? "border-indigo-500/40" : "border-[var(--color-edge)]"
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => onToggleExpand(a)}
@@ -311,23 +304,30 @@ export default function ApplicationTable({
                   {isStale(a, now) ? <StaleBadge days={quietDays(a, now)} /> : null}
                 </div>
               </button>
-              {expanded ? (
-                <ApplicationRowDetail
-                  application={a}
-                  onSaved={onRowSaved}
-                  onDeleted={onRowDeleted}
-                  onClose={() => onToggleExpand(a)}
-                />
-              ) : (
-                <div className="flex items-center justify-between px-4 pb-3">
-                  <StarButton app={a} onToggleStar={onToggleStar} />
-                  <ApplyButton app={a} onApply={onApply} />
-                </div>
-              )}
+              <div className="flex items-center justify-between px-4 pb-3">
+                <StarButton app={a} onToggleStar={onToggleStar} />
+                <ApplyButton app={a} onApply={onApply} />
+              </div>
             </li>
           );
         })}
       </ul>
+
+      {/* One detail panel for the whole table, rendered once outside both the
+          <table> and the mobile list. Keeping it out of a table cell — and giving
+          it a key so switching rows is a clean remount — avoids the reconciliation
+          churn that was resetting its edit state mid-edit. */}
+      {expandedApp ? (
+        <div className="mt-2 overflow-hidden rounded-xl border border-indigo-500/40">
+          <ApplicationRowDetail
+            key={expandedApp._id}
+            application={expandedApp}
+            onSaved={onRowSaved}
+            onDeleted={onRowDeleted}
+            onClose={() => onToggleExpand(expandedApp)}
+          />
+        </div>
+      ) : null}
     </>
   );
 }

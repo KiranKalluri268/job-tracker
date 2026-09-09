@@ -67,8 +67,8 @@ export default function ApplicationRowDetail({
     setEditing(false);
   }
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+  async function save() {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -106,10 +106,7 @@ export default function ApplicationRowDetail({
   }
 
   return (
-    <form
-      onSubmit={save}
-      className="border-t border-[var(--color-edge)] bg-[var(--color-panel-2)] px-5 py-4"
-    >
+    <div className="bg-[var(--color-panel-2)] px-5 py-4">
       <div className="flex items-start justify-between gap-4">
         <h3 className="text-sm font-semibold text-stone-800">
           {application.company} — {application.role}
@@ -120,7 +117,9 @@ export default function ApplicationRowDetail({
           {editing ? (
             <>
               <button
-                type="submit"
+                key="confirm"
+                type="button"
+                onClick={() => save()}
                 disabled={busy}
                 aria-label="Save changes"
                 className="inline-flex size-8 items-center justify-center rounded-lg bg-indigo-600 text-base font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
@@ -128,6 +127,7 @@ export default function ApplicationRowDetail({
                 ✓
               </button>
               <button
+                key="cancel"
                 type="button"
                 onClick={cancelEdit}
                 disabled={busy}
@@ -140,6 +140,7 @@ export default function ApplicationRowDetail({
           ) : (
             <>
               <button
+                key="edit"
                 type="button"
                 onClick={startEdit}
                 aria-label="Edit application"
@@ -148,6 +149,7 @@ export default function ApplicationRowDetail({
                 ✎
               </button>
               <button
+                key="collapse"
                 type="button"
                 onClick={onClose}
                 aria-label="Collapse row"
@@ -398,6 +400,6 @@ export default function ApplicationRowDetail({
           )}
         </div>
       ) : null}
-    </form>
+    </div>
   );
 }
