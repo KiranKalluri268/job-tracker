@@ -17,6 +17,8 @@ export type AppShellProps = {
   initialApplications: Application[];
   initialError: string | null;
   userEmail: string | null;
+  /** Admins get the editing controls; viewers get a read-only table. */
+  canEdit: boolean;
   /** Sign-out lives in a server-action form, so the page passes it down. */
   signOutSlot: React.ReactNode;
   /** The server's instant, so the first client render matches the HTML exactly. */
@@ -35,6 +37,7 @@ export default function AppShell({
   initialApplications,
   initialError,
   userEmail,
+  canEdit,
   signOutSlot,
   serverNow,
 }: AppShellProps) {
@@ -251,6 +254,11 @@ export default function AppShell({
         {userEmail ? (
           <span className="flex items-center gap-3 text-xs text-stone-500">
             {userEmail}
+            {!canEdit ? (
+              <span className="rounded-full bg-stone-500/12 px-2 py-0.5 font-medium text-stone-600 ring-1 ring-stone-500/25 ring-inset">
+                view only
+              </span>
+            ) : null}
             {signOutSlot}
           </span>
         ) : null}
@@ -271,13 +279,19 @@ export default function AppShell({
 
       <StatsBar applications={allApps} now={now} onPickStatus={onPickStatus} />
 
-      <Toolbar filters={filters} onChange={applyFilters} onAdd={() => setCreating(true)} refreshing={refreshing} />
+      <Toolbar
+        filters={filters}
+        onChange={applyFilters}
+        onAdd={canEdit ? () => setCreating(true) : undefined}
+        refreshing={refreshing}
+      />
 
       <ApplicationTable
         applications={apps}
         sort={filters.sort}
         dir={filters.dir}
         expandedId={expandedId}
+        canEdit={canEdit}
         now={now}
         onSort={onSort}
         onToggleExpand={onToggleExpand}

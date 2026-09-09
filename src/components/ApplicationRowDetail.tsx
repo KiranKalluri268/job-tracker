@@ -12,6 +12,8 @@ import { Field, buttonClass, inputClass } from "./ui";
 
 export type RowDetailProps = {
   application: Application;
+  /** Viewers get the read-only panel with no edit or delete controls. */
+  canEdit: boolean;
   onSaved: (app: Application) => void;
   onDeleted: (id: string) => void;
   onClose: () => void;
@@ -36,6 +38,7 @@ const DASH = "—";
  */
 export default function ApplicationRowDetail({
   application,
+  canEdit,
   onSaved,
   onDeleted,
   onClose,
@@ -139,15 +142,17 @@ export default function ApplicationRowDetail({
             </>
           ) : (
             <>
-              <button
-                key="edit"
-                type="button"
-                onClick={startEdit}
-                aria-label="Edit application"
-                className="inline-flex size-8 items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
-              >
-                ✎
-              </button>
+              {canEdit ? (
+                <button
+                  key="edit"
+                  type="button"
+                  onClick={startEdit}
+                  aria-label="Edit application"
+                  className="inline-flex size-8 items-center justify-center rounded-lg border border-[var(--color-edge)] text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
+                >
+                  ✎
+                </button>
+              ) : null}
               <button
                 key="collapse"
                 type="button"

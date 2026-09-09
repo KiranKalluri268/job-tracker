@@ -49,12 +49,16 @@ function DueBadge() {
  */
 function StatusCell({
   app,
+  canEdit,
   onStatusChange,
 }: {
   app: Application;
+  canEdit: boolean;
   onStatusChange: (app: Application, status: Status) => void;
 }) {
   const [open, setOpen] = useState(false);
+
+  if (!canEdit) return <StatusPill status={app.status} />;
 
   if (!open) {
     return (
@@ -96,11 +100,19 @@ function StatusCell({
 }
 
 /**
- * Opens the posting (if there is one) and marks the application Applied in one
- * click. Stops propagation so it doesn't also toggle the row's expansion (which
- * would race the new tab).
+ * Opens the posting (if there is one). For an admin it also marks the application
+ * Applied in the same click; for a viewer it only opens the link. Stops propagation
+ * so it doesn't also toggle the row's expansion (which would race the new tab).
  */
-function ApplyButton({ app, onApply }: { app: Application; onApply: (app: Application) => void }) {
+function ApplyButton({
+  app,
+  canEdit,
+  onApply,
+}: {
+  app: Application;
+  canEdit: boolean;
+  onApply: (app: Application) => void;
+}) {
   if (app.status !== "Saved") return null;
   return (
     <button
@@ -108,7 +120,7 @@ function ApplyButton({ app, onApply }: { app: Application; onApply: (app: Applic
       onClick={(e) => {
         e.stopPropagation();
         if (app.postingUrl) window.open(app.postingUrl, "_blank", "noopener,noreferrer");
-        onApply(app);
+        if (canEdit) onApply(app);
       }}
       className="inline-flex items-center rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-indigo-500"
     >
@@ -151,6 +163,7 @@ export type TableProps = {
   sort: SortKey;
   dir: "asc" | "desc";
   expandedId: string | null;
+  canEdit: boolean;
   onSort: (key: SortKey) => void;
   onToggleExpand: (app: Application) => void;
   onApply: (app: Application) => void;
@@ -166,6 +179,7 @@ export default function ApplicationTable({
   sort,
   dir,
   expandedId,
+  canEdit,
   onSort,
   onToggleExpand,
   onApply,
@@ -213,7 +227,11 @@ export default function ApplicationTable({
           }`}
         >
           <td className="w-10 px-4 py-3 text-center">
-            <StarButton app={a} onToggleStar={onToggleStar} />
+            {canEdit ? (
+              <StarButton app={a} onToggleStar={onToggleStar} />
+            ) : a.starred ? (
+              <span className="text-base leading-none text-amber-500">★</span>
+            ) : null}
           </td>
           <td className="px-4 py-3 font-medium text-stone-800">
             <div className="flex items-center gap-2">
@@ -226,7 +244,7 @@ export default function ApplicationTable({
             {a.location ? <span className="block text-xs text-stone-500">{a.location}</span> : null}
           </td>
           <td className="px-4 py-3">
-            <StatusCell app={a} onStatusChange={onStatusChange} />
+            <StatusCell app={a} canEdit={canEdit} onStatusChange={onStatusChange} />
           </td>
           <td className="px-4 py-3 text-stone-500">{shortDate(a.appliedOn)}</td>
           <td className="px-4 py-3">
@@ -243,7 +261,7 @@ export default function ApplicationTable({
           <td className="px-4 py-3 text-stone-500">{a.source ?? "—"}</td>
           <td className="px-4 py-3 text-stone-500">{shortDate(a.createdAt)}</td>
           <td className="px-4 py-3">
-            <ApplyButton app={a} onApply={onApply} />
+            <ApplyButton app={a} canEdit={canEdit} onApply={onApply} />
           </td>
         </tr>
         {expanded ? (
@@ -252,6 +270,7 @@ export default function ApplicationTable({
               <ApplicationRowDetail
                 key={a._id}
                 application={a}
+                canEdit={canEdit}
                 onSaved={onRowSaved}
                 onDeleted={onRowDeleted}
                 onClose={() => onToggleExpand(a)}
@@ -295,14 +314,19 @@ export default function ApplicationTable({
           <ApplicationRowDetail
             key={a._id}
             application={a}
+            canEdit={canEdit}
             onSaved={onRowSaved}
             onDeleted={onRowDeleted}
             onClose={() => onToggleExpand(a)}
           />
         ) : (
           <div className="flex items-center justify-between px-4 pb-3">
-            <StarButton app={a} onToggleStar={onToggleStar} />
-            <ApplyButton app={a} onApply={onApply} />
+            {canEdit ? (
+              <StarButton app={a} onToggleStar={onToggleStar} />
+            ) : a.starred ? (
+              <span className="text-base leading-none text-amber-500">★</span>
+            ) : null}
+            <ApplyButton app={a} canEdit={canEdit} onApply={onApply} />
           </div>
         )}
       </li>

@@ -10,7 +10,8 @@ import { buttonClass, inputClass, primaryButtonClass } from "./ui";
 export type ToolbarProps = {
   filters: FilterState;
   onChange: (next: FilterState) => void;
-  onAdd: () => void;
+  /** Omitted for view-only users, who get no "Add" button. */
+  onAdd?: () => void;
   refreshing: boolean;
 };
 
@@ -97,9 +98,11 @@ export default function Toolbar({ filters, onChange, onAdd, refreshing }: Toolba
         Export
       </a>
 
-      <button type="button" onClick={onAdd} className={primaryButtonClass}>
-        + Add
-      </button>
+      {onAdd ? (
+        <button type="button" onClick={onAdd} className={primaryButtonClass}>
+          + Add
+        </button>
+      ) : null}
     </div>
   );
 }

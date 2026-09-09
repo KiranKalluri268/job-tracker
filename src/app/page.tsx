@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { auth, signOut } from "@/auth";
+import { AUTH_DISABLED, auth, signOut } from "@/auth";
 import AppShell from "@/components/AppShell";
 import { buildMongoFilter, buildMongoSort, parseFilters } from "@/lib/filters";
 import { applications } from "@/lib/mongodb";
@@ -77,6 +77,9 @@ export default async function Page({
     loadInitial(await searchParams),
   ]);
 
+  // Admins can edit; viewers get a read-only UI. Local auth-disabled mode is an admin.
+  const canEdit = AUTH_DISABLED || session?.user?.role === "admin";
+
   return (
     // AppShell reads useSearchParams, which Next requires to sit under a Suspense
     // boundary so the rest of the page can still be prerendered.
@@ -85,6 +88,7 @@ export default async function Page({
         initialApplications={apps}
         initialError={error}
         userEmail={session?.user?.email ?? null}
+        canEdit={canEdit}
         signOutSlot={<SignOutButton />}
         serverNow={serverNow}
       />

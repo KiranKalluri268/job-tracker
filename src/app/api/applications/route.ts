@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { errorResponse } from "@/lib/api";
+import { assertCanEdit, errorResponse } from "@/lib/api";
 import { buildMongoFilter, buildMongoSort, parseFilters } from "@/lib/filters";
 import { applications } from "@/lib/mongodb";
 import { newDocument, sanitizeInput, serialize } from "@/lib/serialize";
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await assertCanEdit();
     const input = sanitizeInput(await request.json(), { requireCore: true });
     const col = await applications();
     const doc = newDocument(input);

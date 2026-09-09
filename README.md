@@ -53,9 +53,11 @@ cp .env.local.example .env.local
 npx auth secret          # writes AUTH_SECRET
 ```
 
-Fill in `MONGODB_URI`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `ALLOWED_EMAILS`
-(a comma-separated list of every Google account that should be able to sign in). An
-empty `ALLOWED_EMAILS` locks everyone out — it deliberately does not fail open.
+Fill in `MONGODB_URI`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and the two
+allowlists: `ADMIN_EMAILS` (accounts that can read and edit) and `VIEW_EMAILS`
+(accounts that can only read). An account on neither list cannot sign in; empty
+lists lock everyone out — this deliberately does not fail open. `ALLOWED_EMAILS`
+is still read as an admin list when `ADMIN_EMAILS` is unset.
 
 ```bash
 npm install
@@ -64,12 +66,13 @@ npm run dev              # http://localhost:3000
 
 ### 4. Deploy
 
-Push to GitHub, import the repo on Vercel, paste the same six env vars into
+Push to GitHub, import the repo on Vercel, paste the same env vars into
 **Settings → Environment Variables**, deploy, then add the production callback URL to
 the Google client from step 2.
 
-To add or remove who can sign in later, edit `ALLOWED_EMAILS` in **Settings →
-Environment Variables** and redeploy — no code change needed.
+To change who can sign in or move someone between admin and view-only, edit
+`ADMIN_EMAILS` / `VIEW_EMAILS` in **Settings → Environment Variables** and redeploy
+— no code change needed.
 
 ## Scripts
 
@@ -87,7 +90,7 @@ src/lib/        filters.ts, stats.ts, stale.ts, csv.ts — pure, unit-tested log
                 mongodb.ts (pooled client), serialize.ts (validation + shaping)
 src/app/api/    applications CRUD + CSV export
 src/components/ AppShell owns URL state; the rest are presentational
-src/auth.ts     NextAuth config — the email allowlist
+src/auth.ts     NextAuth config — the admin/view email allowlists
 src/proxy.ts    route protection
 ```
 

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { errorResponse } from "@/lib/api";
+import { assertCanEdit, errorResponse } from "@/lib/api";
 import { applications } from "@/lib/mongodb";
 import { sanitizeInput, serialize, toObjectId, ValidationError } from "@/lib/serialize";
 import type { AppEvent, Status } from "@/lib/types";
@@ -11,6 +11,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, { params }: Ctx) {
   try {
+    await assertCanEdit();
     const _id = toObjectId((await params).id);
     const body = (await request.json()) as Record<string, unknown>;
     const input = sanitizeInput(body, { requireCore: false });
@@ -50,6 +51,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
 export async function DELETE(_request: NextRequest, { params }: Ctx) {
   try {
+    await assertCanEdit();
     const _id = toObjectId((await params).id);
     const col = await applications();
     const { deletedCount } = await col.deleteOne({ _id });
