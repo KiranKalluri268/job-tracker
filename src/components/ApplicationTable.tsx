@@ -23,6 +23,9 @@ const COLUMNS: { key: SortKey | null; label: string; className?: string }[] = [
   { key: null, label: "Actions" },
 ];
 
+/** Outcomes that drop to their own table at the bottom. */
+const ARCHIVED_STATUSES: readonly Status[] = ["Rejected", "Not qualified", "Expired", "Ghosted"];
+
 function StaleBadge({ days }: { days: number }) {
   return (
     <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-500/25 ring-inset">
@@ -185,9 +188,132 @@ export default function ApplicationTable({
 
   const arrow = (key: SortKey | null) => (key && key === sort ? (dir === "asc" ? " ↑" : " ↓") : "");
 
+  // The list arrives already sorted and filtered. Splitting it here keeps each
+  // table sorted and filtered on its own — an archived row never sorts up among
+  // the live ones, and vice versa.
+  const live = applications.filter((a) => !ARCHIVED_STATUSES.includes(a.status));
+  const archived = applications.filter((a) => ARCHIVED_STATUSES.includes(a.status));
+
+  const desktopRow = (a: Application) => {
+    const stale = isStale(a, now);
+    const expanded = expandedId === a._id;
+    return (
+      <Fragment key={a._id}>
+        <tr
+          tabIndex={0}
+          onClick={() => onToggleExpand(a)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onToggleExpand(a);
+            }
+          }}
+          className={`cursor-pointer border-b border-[var(--color-edge)] align-top transition last:border-0 focus:bg-black/[0.04] focus:outline-none ${
+            expanded ? "bg-black/[0.03]" : "hover:bg-black/[0.03]"
+          }`}
+        >
+          <td className="w-10 px-4 py-3 text-center">
+            <StarButton app={a} onToggleStar={onToggleStar} />
+          </td>
+          <td className="px-4 py-3 font-medium text-stone-800">
+            <div className="flex items-center gap-2">
+              {a.company}
+              {stale ? <StaleBadge days={quietDays(a, now)} /> : null}
+            </div>
+          </td>
+          <td className="px-4 py-3 text-stone-600">
+            {a.role}
+            {a.location ? <span className="block text-xs text-stone-500">{a.location}</span> : null}
+          </td>
+          <td className="px-4 py-3">
+            <StatusCell app={a} onStatusChange={onStatusChange} />
+          </td>
+          <td className="px-4 py-3 text-stone-500">{shortDate(a.appliedOn)}</td>
+          <td className="px-4 py-3">
+            <div className="flex items-center gap-2 text-stone-500">
+              {shortDate(a.nextActionOn)}
+              {isActionDue(a, now) ? <DueBadge /> : null}
+            </div>
+            {a.nextActionNote ? (
+              <span className="block max-w-52 truncate text-xs text-stone-500">
+                {a.nextActionNote}
+              </span>
+            ) : null}
+          </td>
+          <td className="px-4 py-3 text-stone-500">{a.source ?? "—"}</td>
+          <td className="px-4 py-3 text-stone-500">{shortDate(a.updatedAt)}</td>
+          <td className="px-4 py-3">
+            <ApplyButton app={a} onApply={onApply} />
+          </td>
+        </tr>
+        {expanded ? (
+          <tr>
+            <td colSpan={COLUMNS.length} className="border-b border-[var(--color-edge)] p-0">
+              <ApplicationRowDetail
+                key={a._id}
+                application={a}
+                onSaved={onRowSaved}
+                onDeleted={onRowDeleted}
+                onClose={() => onToggleExpand(a)}
+              />
+            </td>
+          </tr>
+        ) : null}
+      </Fragment>
+    );
+  };
+
+  const mobileCard = (a: Application) => {
+    const expanded = expandedId === a._id;
+    return (
+      <li
+        key={a._id}
+        className={`overflow-hidden rounded-xl border ${
+          expanded ? "border-indigo-500/40" : "border-[var(--color-edge)]"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => onToggleExpand(a)}
+          className="w-full bg-[var(--color-panel)] px-4 py-3 text-left transition active:bg-black/5"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate font-medium text-stone-800">{a.company}</p>
+              <p className="truncate text-sm text-stone-500">{a.role}</p>
+            </div>
+            <StatusPill status={a.status} />
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500">
+            <span>Applied {shortDate(a.appliedOn)}</span>
+            {a.nextActionOn ? <span>· Next {shortDate(a.nextActionOn)}</span> : null}
+            {isActionDue(a, now) ? <DueBadge /> : null}
+            {isStale(a, now) ? <StaleBadge days={quietDays(a, now)} /> : null}
+          </div>
+        </button>
+        {expanded ? (
+          <ApplicationRowDetail
+            key={a._id}
+            application={a}
+            onSaved={onRowSaved}
+            onDeleted={onRowDeleted}
+            onClose={() => onToggleExpand(a)}
+          />
+        ) : (
+          <div className="flex items-center justify-between px-4 pb-3">
+            <StarButton app={a} onToggleStar={onToggleStar} />
+            <ApplyButton app={a} onApply={onApply} />
+          </div>
+        )}
+      </li>
+    );
+  };
+
   return (
     <>
-      {/* Desktop: a real table. */}
+      {/* Desktop: a real table. Archived rows sit in a second <tbody> so the
+          columns still line up, separated by a spacer row and with no header of
+          their own. */}
       <div className="hidden overflow-x-auto rounded-xl border border-[var(--color-edge)] md:block">
         <table className="w-full min-w-[860px] border-collapse text-sm">
           <thead>
@@ -214,127 +340,23 @@ export default function ApplicationTable({
               ))}
             </tr>
           </thead>
-          <tbody>
-            {applications.map((a) => {
-              const stale = isStale(a, now);
-              const expanded = expandedId === a._id;
-              return (
-                <Fragment key={a._id}>
-                <tr
-                  tabIndex={0}
-                  onClick={() => onToggleExpand(a)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onToggleExpand(a);
-                    }
-                  }}
-                  className={`cursor-pointer border-b border-[var(--color-edge)] align-top transition last:border-0 focus:bg-black/[0.04] focus:outline-none ${
-                    expanded ? "bg-black/[0.03]" : "hover:bg-black/[0.03]"
-                  }`}
-                >
-                  <td className="w-10 px-4 py-3 text-center">
-                    <StarButton app={a} onToggleStar={onToggleStar} />
-                  </td>
-                  <td className="px-4 py-3 font-medium text-stone-800">
-                    <div className="flex items-center gap-2">
-                      {a.company}
-                      {stale ? <StaleBadge days={quietDays(a, now)} /> : null}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-stone-600">
-                    {a.role}
-                    {a.location ? <span className="block text-xs text-stone-500">{a.location}</span> : null}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusCell app={a} onStatusChange={onStatusChange} />
-                  </td>
-                  <td className="px-4 py-3 text-stone-500">{shortDate(a.appliedOn)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 text-stone-500">
-                      {shortDate(a.nextActionOn)}
-                      {isActionDue(a, now) ? <DueBadge /> : null}
-                    </div>
-                    {a.nextActionNote ? (
-                      <span className="block max-w-52 truncate text-xs text-stone-500">
-                        {a.nextActionNote}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3 text-stone-500">{a.source ?? "—"}</td>
-                  <td className="px-4 py-3 text-stone-500">{shortDate(a.updatedAt)}</td>
-                  <td className="px-4 py-3">
-                    <ApplyButton app={a} onApply={onApply} />
-                  </td>
-                </tr>
-                {expanded ? (
-                  <tr>
-                    <td colSpan={COLUMNS.length} className="border-b border-[var(--color-edge)] p-0">
-                      <ApplicationRowDetail
-                        key={a._id}
-                        application={a}
-                        onSaved={onRowSaved}
-                        onDeleted={onRowDeleted}
-                        onClose={() => onToggleExpand(a)}
-                      />
-                    </td>
-                  </tr>
-                ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
+          <tbody>{live.map(desktopRow)}</tbody>
+          {archived.length ? (
+            <tbody>
+              <tr aria-hidden>
+                <td colSpan={COLUMNS.length} className="h-8 bg-[var(--color-ink)]" />
+              </tr>
+              {archived.map(desktopRow)}
+            </tbody>
+          ) : null}
         </table>
       </div>
 
-      {/* Mobile: the same rows as stacked cards. */}
-      <ul className="space-y-2 md:hidden">
-        {applications.map((a) => {
-          const expanded = expandedId === a._id;
-          return (
-            <li
-              key={a._id}
-              className={`overflow-hidden rounded-xl border ${
-                expanded ? "border-indigo-500/40" : "border-[var(--color-edge)]"
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => onToggleExpand(a)}
-                className="w-full bg-[var(--color-panel)] px-4 py-3 text-left transition active:bg-black/5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-stone-800">{a.company}</p>
-                    <p className="truncate text-sm text-stone-500">{a.role}</p>
-                  </div>
-                  <StatusPill status={a.status} />
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500">
-                  <span>Applied {shortDate(a.appliedOn)}</span>
-                  {a.nextActionOn ? <span>· Next {shortDate(a.nextActionOn)}</span> : null}
-                  {isActionDue(a, now) ? <DueBadge /> : null}
-                  {isStale(a, now) ? <StaleBadge days={quietDays(a, now)} /> : null}
-                </div>
-              </button>
-              {expanded ? (
-                <ApplicationRowDetail
-                  key={a._id}
-                  application={a}
-                  onSaved={onRowSaved}
-                  onDeleted={onRowDeleted}
-                  onClose={() => onToggleExpand(a)}
-                />
-              ) : (
-                <div className="flex items-center justify-between px-4 pb-3">
-                  <StarButton app={a} onToggleStar={onToggleStar} />
-                  <ApplyButton app={a} onApply={onApply} />
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {/* Mobile: the same rows as stacked cards, archived ones after a gap. */}
+      <ul className="space-y-2 md:hidden">{live.map(mobileCard)}</ul>
+      {archived.length ? (
+        <ul className="mt-6 space-y-2 md:hidden">{archived.map(mobileCard)}</ul>
+      ) : null}
     </>
   );
 }
