@@ -188,6 +188,21 @@ export default function AppShell({
       });
   }, []);
 
+  // Quick-archive buttons in the expanded detail ("Expired?", "Not qualified"):
+  // switch the status, collapse this row, and open the next one in the list so the
+  // user can keep triaging without reaching for the mouse.
+  const onStatusAdvance = useCallback(
+    (app: Application, status: Status) => {
+      onStatusChange(app, status);
+      setExpandedId(() => {
+        const i = apps.findIndex((a) => a._id === app._id);
+        const next = i === -1 ? undefined : apps[i + 1];
+        return next ? next._id : null;
+      });
+    },
+    [apps, onStatusChange],
+  );
+
   // One-click "Apply" from the table row: opens the posting (the caller does that
   // synchronously, before this resolves, so popup blockers don't eat it) and moves
   // the application out of Saved. Reuses onSaved so the row merges the same way an
@@ -298,6 +313,7 @@ export default function AppShell({
         onApply={onQuickApply}
         onToggleStar={onToggleStar}
         onStatusChange={onStatusChange}
+        onStatusAdvance={onStatusAdvance}
         onRowSaved={mergeRow}
         onRowDeleted={onDeleted}
       />

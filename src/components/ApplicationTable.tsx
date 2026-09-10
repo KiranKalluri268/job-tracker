@@ -169,6 +169,7 @@ export type TableProps = {
   onApply: (app: Application) => void;
   onToggleStar: (app: Application) => void;
   onStatusChange: (app: Application, status: Status) => void;
+  onStatusAdvance: (app: Application, status: Status) => void;
   onRowSaved: (app: Application) => void;
   onRowDeleted: (id: string) => void;
   now: Date;
@@ -185,6 +186,7 @@ export default function ApplicationTable({
   onApply,
   onToggleStar,
   onStatusChange,
+  onStatusAdvance,
   onRowSaved,
   onRowDeleted,
   now,
@@ -274,6 +276,7 @@ export default function ApplicationTable({
                 onSaved={onRowSaved}
                 onDeleted={onRowDeleted}
                 onClose={() => onToggleExpand(a)}
+                onQuickStatus={(status) => onStatusAdvance(a, status)}
               />
             </td>
           </tr>
@@ -318,6 +321,7 @@ export default function ApplicationTable({
             onSaved={onRowSaved}
             onDeleted={onRowDeleted}
             onClose={() => onToggleExpand(a)}
+            onQuickStatus={(status) => onStatusAdvance(a, status)}
           />
         ) : (
           <div className="flex items-center justify-between px-4 pb-3">
