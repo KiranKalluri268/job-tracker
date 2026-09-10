@@ -6,7 +6,7 @@ import { shortDate } from "@/lib/dates";
 import type { SortKey } from "@/lib/filters";
 import { isActionDue, isStale, quietDays } from "@/lib/stale";
 import type { Application, Status } from "@/lib/types";
-import { STATUSES } from "@/lib/types";
+import { RESPONDED, STATUSES } from "@/lib/types";
 
 import ApplicationRowDetail from "./ApplicationRowDetail";
 import { StatusPill, inputClass } from "./ui";
@@ -216,6 +216,15 @@ export default function ApplicationTable({
   const live = applications.filter((a) => !ARCHIVED_STATUSES.includes(a.status));
   const archived = applications.filter((a) => ARCHIVED_STATUSES.includes(a.status));
 
+  // The live rows split three ways, in the order they appear down the table:
+  //   1. not applied yet ("Saved")
+  //   2. applied and the company came back (RESPONDED)
+  //   3. applied, still waiting — the pool that eventually goes Ghosted
+  const notApplied = live.filter((a) => a.status === "Saved");
+  const responded = live.filter((a) => a.status !== "Saved" && RESPONDED.includes(a.status));
+  const awaiting = live.filter((a) => a.status !== "Saved" && !RESPONDED.includes(a.status));
+  const liveGroups = [notApplied, responded, awaiting].filter((g) => g.length);
+
   const desktopRow = (a: Application) => {
     const stale = isStale(a, now);
     const expanded = expandedId === a._id;
@@ -374,7 +383,16 @@ export default function ApplicationTable({
               ))}
             </tr>
           </thead>
-          <tbody>{live.map(desktopRow)}</tbody>
+          {liveGroups.map((group, i) => (
+            <tbody key={i}>
+              {i > 0 ? (
+                <tr aria-hidden>
+                  <td colSpan={COLUMNS.length} className="h-4 bg-[var(--color-ink)]" />
+                </tr>
+              ) : null}
+              {group.map(desktopRow)}
+            </tbody>
+          ))}
           {archived.length ? (
             <tbody>
               <tr aria-hidden>
@@ -387,7 +405,11 @@ export default function ApplicationTable({
       </div>
 
       {/* Mobile: the same rows as stacked cards, archived ones after a gap. */}
-      <ul className="space-y-2 md:hidden">{live.map(mobileCard)}</ul>
+      {liveGroups.map((group, i) => (
+        <ul key={i} className={`space-y-2 md:hidden ${i > 0 ? "mt-6" : ""}`}>
+          {group.map(mobileCard)}
+        </ul>
+      ))}
       {archived.length ? (
         <ul className="mt-6 space-y-2 md:hidden">{archived.map(mobileCard)}</ul>
       ) : null}
