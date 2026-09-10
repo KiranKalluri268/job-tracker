@@ -6,11 +6,14 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { parseFilters, toSearchParams, type FilterState, type SortKey } from "@/lib/filters";
 import type { Application, Status } from "@/lib/types";
 
+import { draftOf, payloadOf } from "./applicationDraft";
 import ApplicationModal from "./ApplicationModal";
 import ApplicationTable from "./ApplicationTable";
 import AttentionStrip from "./AttentionStrip";
 import StatsBar from "./StatsBar";
+import { ToastViewport, useToasts } from "./Toast";
 import Toolbar from "./Toolbar";
+import { useHistory } from "./useHistory";
 import { useNow } from "./useNow";
 
 export type AppShellProps = {
@@ -57,6 +60,22 @@ export default function AppShell({
   // table, so all the table needs from here is which row is expanded.
   const [creating, setCreating] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const history = useHistory();
+  const { push: pushHistory, undo: undoHistory, redo: redoHistory } = history;
+  const { toasts, addToast, dismiss: dismissToast } = useToasts();
+
+  // The mutation handlers need the row as it was *before* their optimistic edit
+  // (to roll back, and to build undo entries). Mirror the lists into refs so a
+  // handler can read the current row without depending on it.
+  const appsRef = useRef(apps);
+  const allAppsRef = useRef(allApps);
+  useEffect(() => {
+    appsRef.current = apps;
+  }, [apps]);
+  useEffect(() => {
+    allAppsRef.current = allApps;
+  }, [allApps]);
 
   const now = useNow(serverNow);
 
@@ -157,110 +176,220 @@ export default function AppShell({
     setExpandedId((current) => (current === app._id ? null : app._id));
   }, []);
 
-  // Inline status switch from the table. Optimistic, reconciled against the server
-  // response (which also carries the freshly written timeline entry), rolled back
-  // on failure.
-  const onStatusChange = useCallback((app: Application, status: Status) => {
-    const setStatus = (value: Status) => (list: Application[]) =>
-      list.map((a) => (a._id === app._id ? { ...a, status: value } : a));
-    setApps(setStatus(status));
-    setAllApps(setStatus(status));
+  // A single PATCH against one application: optimistic patch now, reconcile with
+  // the server's row on success, roll back to the pre-call row on failure. Every
+  // in-place mutation below — and every undo/redo — goes through here.
+  const patchApp = useCallback(
+    async (
+      id: string,
+      body: Record<string, unknown>,
+      optimistic: (a: Application) => Application,
+    ) => {
+      const prev =
+        appsRef.current.find((a) => a._id === id) ?? allAppsRef.current.find((a) => a._id === id);
+      const apply = (fn: (a: Application) => Application) => (list: Application[]) =>
+        list.map((a) => (a._id === id ? fn(a) : a));
 
-    fetch(`/api/applications/${app._id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    })
-      .then(async (res) => {
+      setApps(apply(optimistic));
+      setAllApps(apply(optimistic));
+
+      try {
+        const res = await fetch(`/api/applications/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "Could not update application");
-        return json.application as Application;
-      })
-      .then((updated) => {
-        const merge = (list: Application[]) => list.map((a) => (a._id === updated._id ? updated : a));
-        setApps(merge);
-        setAllApps(merge);
-      })
-      .catch((err: unknown) => {
-        setApps(setStatus(app.status));
-        setAllApps(setStatus(app.status));
-        setError(err instanceof Error ? err.message : "Could not update application");
-      });
-  }, []);
-
-  // Quick-archive buttons in the expanded detail ("Expired?", "Not qualified"):
-  // switch the status, collapse this row, and open the next one in the list so the
-  // user can keep triaging without reaching for the mouse.
-  const onStatusAdvance = useCallback(
-    (app: Application, status: Status) => {
-      onStatusChange(app, status);
-      setExpandedId(() => {
-        const i = apps.findIndex((a) => a._id === app._id);
-        const next = i === -1 ? undefined : apps[i + 1];
-        return next ? next._id : null;
-      });
+        const updated = json.application as Application;
+        setApps(apply(() => updated));
+        setAllApps(apply(() => updated));
+      } catch (err) {
+        if (prev) {
+          setApps(apply(() => prev));
+          setAllApps(apply(() => prev));
+        }
+        throw err instanceof Error ? err : new Error("Could not update application");
+      }
     },
-    [apps, onStatusChange],
+    [],
   );
 
-  // One-click "Apply" from the table row: opens the posting (the caller does that
-  // synchronously, before this resolves, so popup blockers don't eat it) and moves
-  // the application out of Saved. Reuses onSaved so the row merges the same way an
-  // edit from the modal would.
-  const onQuickApply = useCallback(
-    (app: Application) => {
-      fetch(`/api/applications/${app._id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "Applied" }),
-      })
-        .then(async (res) => {
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error ?? "Could not update application");
-          return json.application as Application;
-        })
-        .then((updated) => {
-          const merge = (list: Application[]) => list.map((a) => (a._id === updated._id ? updated : a));
-          setApps(merge);
-          setAllApps(merge);
+  // Replay a history entry and announce the result. The keyboard shortcut and the
+  // toast's own button both land here.
+  const doRedo = useCallback(async () => {
+    try {
+      const entry = await redoHistory();
+      addToast(entry ? `Redone: ${entry.label}` : "Nothing to redo", { source: "history" });
+      if (entry) reloadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not redo");
+    }
+  }, [redoHistory, addToast, reloadAll]);
+
+  const doUndo = useCallback(async () => {
+    try {
+      const entry = await undoHistory();
+      addToast(
+        entry ? `Undone: ${entry.label}` : "Nothing to undo",
+        entry
+          ? { source: "history", action: { label: "Redo", onClick: () => void doRedo() } }
+          : { source: "history" },
+      );
+      if (entry) reloadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not undo");
+    }
+  }, [undoHistory, addToast, doRedo, reloadAll]);
+
+  const undoToastAction = useMemo(
+    () => ({ label: "Undo", onClick: () => void doUndo() }),
+    [doUndo],
+  );
+
+  // Inline status switch from the table / expanded detail. Optimistic, reconciled
+  // against the server response (which also carries the freshly written timeline
+  // entry), rolled back on failure, and pushed onto the undo history.
+  const onStatusChange = useCallback(
+    (app: Application, status: Status) => {
+      const opt = (s: Status) => (a: Application) => ({ ...a, status: s });
+      patchApp(app._id, { status }, opt(status))
+        .then(() => {
+          pushHistory({
+            label: "status change",
+            undo: () => patchApp(app._id, { status: app.status }, opt(app.status)),
+            redo: () => patchApp(app._id, { status }, opt(status)),
+          });
+          addToast(`Moved to ${status}`, { source: `status:${app._id}`, action: undoToastAction });
         })
         .catch((err: unknown) => {
           setError(err instanceof Error ? err.message : "Could not update application");
         });
     },
-    [],
+    [patchApp, pushHistory, addToast, undoToastAction],
   );
 
-  // Star/unstar straight from the table. Optimistic: flip the row now, reconcile
-  // with the server response, and roll back on failure.
-  const onToggleStar = useCallback((app: Application) => {
-    const next = !app.starred;
-    const setStar = (value: boolean) => (list: Application[]) =>
-      list.map((a) => (a._id === app._id ? { ...a, starred: value } : a));
-    setApps(setStar(next));
-    setAllApps(setStar(next));
-
-    fetch(`/api/applications/${app._id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ starred: next }),
-    })
-      .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Could not update application");
-        return json.application as Application;
-      })
-      .then((updated) => {
-        const merge = (list: Application[]) => list.map((a) => (a._id === updated._id ? updated : a));
-        setApps(merge);
-        setAllApps(merge);
-      })
-      .catch((err: unknown) => {
-        setApps(setStar(app.starred));
-        setAllApps(setStar(app.starred));
-        setError(err instanceof Error ? err.message : "Could not update application");
+  // Quick-archive buttons in the expanded detail ("Expired?", "Not qualified"):
+  // switch the status, collapse this row, and open the next one in the list so the
+  // user can keep triaging without reaching for the mouse. (Undo restores the
+  // status only, not which row was open.)
+  const onStatusAdvance = useCallback(
+    (app: Application, status: Status) => {
+      onStatusChange(app, status);
+      setExpandedId(() => {
+        const list = appsRef.current;
+        const i = list.findIndex((a) => a._id === app._id);
+        const next = i === -1 ? undefined : list[i + 1];
+        return next ? next._id : null;
       });
-  }, []);
+    },
+    [onStatusChange],
+  );
+
+  // One-click "Apply" from the table row: opens the posting (the caller does that
+  // synchronously, before this resolves, so popup blockers don't eat it) and moves
+  // the application out of Saved.
+  const onQuickApply = useCallback(
+    (app: Application) => {
+      const opt = (s: Status) => (a: Application) => ({ ...a, status: s });
+      patchApp(app._id, { status: "Applied" }, opt("Applied"))
+        .then(() => {
+          pushHistory({
+            label: "apply",
+            undo: () => patchApp(app._id, { status: app.status }, opt(app.status)),
+            redo: () => patchApp(app._id, { status: "Applied" }, opt("Applied")),
+          });
+          addToast(`Applied to ${app.company}`, {
+            source: `status:${app._id}`,
+            action: undoToastAction,
+          });
+        })
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : "Could not update application");
+        });
+    },
+    [patchApp, pushHistory, addToast, undoToastAction],
+  );
+
+  // Star/unstar straight from the table. Optimistic, reconciled with the server
+  // response, rolled back on failure, and undoable.
+  const onToggleStar = useCallback(
+    (app: Application) => {
+      const next = !app.starred;
+      const opt = (v: boolean) => (a: Application) => ({ ...a, starred: v });
+      patchApp(app._id, { starred: next }, opt(next))
+        .then(() => {
+          pushHistory({
+            label: "star",
+            undo: () => patchApp(app._id, { starred: app.starred }, opt(app.starred)),
+            redo: () => patchApp(app._id, { starred: next }, opt(next)),
+          });
+          addToast(`${next ? "Starred" : "Unstarred"} ${app.company}`, {
+            source: `star:${app._id}`,
+            action: undoToastAction,
+          });
+        })
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : "Could not update application");
+        });
+    },
+    [patchApp, pushHistory, addToast, undoToastAction],
+  );
+
+  // Inline edit-save from the expanded row. RowDetail has already written the row;
+  // here we merge it and record an undo that PATCHes every field back to how it
+  // was, with redo re-applying the saved values.
+  const onRowSaved = useCallback(
+    (saved: Application) => {
+      const before =
+        appsRef.current.find((a) => a._id === saved._id) ??
+        allAppsRef.current.find((a) => a._id === saved._id);
+      mergeRow(saved);
+      if (!before) return;
+      const beforeBody = payloadOf(draftOf(before)) as unknown as Record<string, unknown>;
+      const afterBody = payloadOf(draftOf(saved)) as unknown as Record<string, unknown>;
+      if (JSON.stringify(beforeBody) === JSON.stringify(afterBody)) return;
+      pushHistory({
+        label: "edit",
+        undo: () => patchApp(saved._id, beforeBody, () => before),
+        redo: () => patchApp(saved._id, afterBody, () => saved),
+      });
+      addToast(`Saved changes to ${saved.company}`, {
+        source: `edit:${saved._id}`,
+        action: undoToastAction,
+      });
+    },
+    [mergeRow, pushHistory, patchApp, addToast, undoToastAction],
+  );
+
+  // Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) drive undo/redo, but not while a text field
+  // is focused, where those keys mean native text editing.
+  useEffect(() => {
+    if (!canEdit) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.repeat) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        void doUndo();
+      } else if (k === "y" || (k === "z" && e.shiftKey)) {
+        e.preventDefault();
+        void doRedo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [canEdit, doUndo, doRedo]);
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-4 px-4 py-6 sm:px-6 sm:py-8">
@@ -314,7 +443,7 @@ export default function AppShell({
         onToggleStar={onToggleStar}
         onStatusChange={onStatusChange}
         onStatusAdvance={onStatusAdvance}
-        onRowSaved={mergeRow}
+        onRowSaved={onRowSaved}
         onRowDeleted={onDeleted}
       />
 
@@ -326,6 +455,8 @@ export default function AppShell({
           onDeleted={onDeleted}
         />
       ) : null}
+
+      <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </main>
   );
 }
