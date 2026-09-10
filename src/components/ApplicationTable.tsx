@@ -198,6 +198,8 @@ export default function ApplicationTable({
   onRowDeleted,
   now,
 }: TableProps) {
+  const [showClosed, setShowClosed] = useState(false);
+
   if (!applications.length) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--color-edge)] px-6 py-16 text-center">
@@ -394,25 +396,73 @@ export default function ApplicationTable({
               {group.map(desktopRow)}
             </tbody>
           ))}
-          {archived.length ? (
-            <tbody>
-              <tr aria-hidden>
-                <td colSpan={COLUMNS.length} className="h-8 bg-[var(--color-ink)]" />
-              </tr>
-              {archived.map(desktopRow)}
-            </tbody>
-          ) : null}
         </table>
       </div>
 
-      {/* Mobile: the same rows as stacked cards, archived ones after a gap. */}
+      {/* Mobile: the same live rows as stacked cards. */}
       {liveGroups.map((group, i) => (
         <ul key={i} className={`space-y-2 md:hidden ${i > 0 ? "mt-6" : ""}`}>
           {group.map(mobileCard)}
         </ul>
       ))}
+
+      {/* Closed applications live in their own table, collapsed by default.
+          They are already loaded — the toggle just avoids rendering a long
+          tail of finished rows nobody is looking at. */}
       {archived.length ? (
-        <ul className="mt-6 space-y-2 md:hidden">{archived.map(mobileCard)}</ul>
+        <div className="mt-6 overflow-hidden rounded-xl border border-[var(--color-edge)]">
+          <button
+            type="button"
+            onClick={() => setShowClosed((v) => !v)}
+            className="flex w-full items-center justify-between bg-[var(--color-panel)] px-4 py-3 text-left text-sm font-medium text-stone-600 transition hover:text-stone-900"
+            aria-expanded={showClosed}
+          >
+            <span>
+              {showClosed ? "Hide" : "Fetch"} closed applications
+              <span className="ml-2 text-stone-400">({archived.length})</span>
+            </span>
+            <span aria-hidden className="text-stone-400">
+              {showClosed ? "▲" : "▼"}
+            </span>
+          </button>
+
+          {showClosed ? (
+            <>
+              <div className="hidden overflow-x-auto border-t border-[var(--color-edge)] md:block">
+                <table className="w-full min-w-[860px] border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-[var(--color-panel)] text-left">
+                      {COLUMNS.map((col) => (
+                        <th
+                          key={col.label}
+                          scope="col"
+                          className="border-b border-[var(--color-edge)] px-4 py-3 text-xs font-semibold tracking-wide text-stone-500 uppercase"
+                        >
+                          {col.key ? (
+                            <button
+                              type="button"
+                              onClick={() => onSort(col.key as SortKey)}
+                              className="transition hover:text-stone-800"
+                            >
+                              {col.label}
+                              {arrow(col.key)}
+                            </button>
+                          ) : (
+                            col.label
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>{archived.map(desktopRow)}</tbody>
+                </table>
+              </div>
+              <ul className="space-y-2 border-t border-[var(--color-edge)] p-3 md:hidden">
+                {archived.map(mobileCard)}
+              </ul>
+            </>
+          ) : null}
+        </div>
       ) : null}
     </>
   );
