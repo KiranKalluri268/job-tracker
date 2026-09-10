@@ -17,6 +17,11 @@ export type RowDetailProps = {
   onSaved: (app: Application) => void;
   onDeleted: (id: string) => void;
   onClose: () => void;
+  /**
+   * Quick-triage shortcut from the view panel: set the status, collapse this row,
+   * and jump to the next one. Absent for viewers.
+   */
+  onQuickStatus?: (status: Status) => void;
 };
 
 /** One read-only label/value pair for view mode. */
@@ -42,6 +47,7 @@ export default function ApplicationRowDetail({
   onSaved,
   onDeleted,
   onClose,
+  onQuickStatus,
 }: RowDetailProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => draftOf(application));
@@ -363,6 +369,24 @@ export default function ApplicationRowDetail({
               ) : (
                 DASH
               )}
+              {canEdit && onQuickStatus ? (
+                <span className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onQuickStatus("Expired")}
+                    className="rounded-lg border border-[var(--color-edge)] px-2.5 py-1 text-xs font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
+                  >
+                    Expired?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onQuickStatus("Not qualified")}
+                    className="rounded-lg border border-[var(--color-edge)] px-2.5 py-1 text-xs font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
+                  >
+                    Not qualified
+                  </button>
+                </span>
+              ) : null}
             </Cell>
             <Cell label="Created">{shortDate(application.createdAt)}</Cell>
             <div className="sm:col-span-2 lg:col-span-3">
