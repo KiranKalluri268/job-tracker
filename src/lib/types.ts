@@ -9,6 +9,7 @@ export const STATUSES = [
   "Expired",
   "Ghosted",
   "Not interested",
+  "Broken link",
 ] as const;
 
 export type Status = (typeof STATUSES)[number];
@@ -27,6 +28,7 @@ export const CLOSED: readonly Status[] = [
   "Expired",
   "Ghosted",
   "Not interested",
+  "Broken link",
 ];
 
 export type AppEvent = {
@@ -74,6 +76,7 @@ export const STATUS_TONE: Record<Status, string> = {
   Expired: "bg-amber-700/12 text-amber-800 ring-amber-700/25",
   Ghosted: "bg-stone-500/12 text-stone-600 ring-stone-500/25",
   "Not interested": "bg-zinc-500/12 text-zinc-600 ring-zinc-500/25",
+  "Broken link": "bg-neutral-500/12 text-neutral-600 ring-neutral-500/25",
 };
 
 export function isStatus(value: unknown): value is Status {

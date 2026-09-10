@@ -392,6 +392,13 @@ export default function ApplicationRowDetail({
                   >
                     Not interested
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => onQuickStatus("Broken link")}
+                    className="rounded-lg border border-[var(--color-edge)] px-2.5 py-1 text-xs font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
+                  >
+                    Broken link
+                  </button>
                 </span>
               ) : null}
             </Cell>

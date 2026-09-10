@@ -30,6 +30,7 @@ const ARCHIVED_STATUSES: readonly Status[] = [
   "Expired",
   "Ghosted",
   "Not interested",
+  "Broken link",
 ];
 
 function StaleBadge({ days }: { days: number }) {
