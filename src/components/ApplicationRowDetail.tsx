@@ -370,7 +370,7 @@ export default function ApplicationRowDetail({
                 DASH
               )}
               {canEdit && onQuickStatus ? (
-                <span className="mt-2 flex flex-wrap gap-2">
+                <span className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => onQuickStatus("Expired")}
@@ -384,6 +384,13 @@ export default function ApplicationRowDetail({
                     className="rounded-lg border border-[var(--color-edge)] px-2.5 py-1 text-xs font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
                   >
                     Not qualified
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onQuickStatus("Not interested")}
+                    className="rounded-lg border border-[var(--color-edge)] px-2.5 py-1 text-xs font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
+                  >
+                    Not interested
                   </button>
                 </span>
               ) : null}
