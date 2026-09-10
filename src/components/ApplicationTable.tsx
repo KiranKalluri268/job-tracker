@@ -24,7 +24,13 @@ const COLUMNS: { key: SortKey | null; label: string; className?: string }[] = [
 ];
 
 /** Outcomes that drop to their own table at the bottom. */
-const ARCHIVED_STATUSES: readonly Status[] = ["Rejected", "Not qualified", "Expired", "Ghosted"];
+const ARCHIVED_STATUSES: readonly Status[] = [
+  "Rejected",
+  "Not qualified",
+  "Expired",
+  "Ghosted",
+  "Not interested",
+];
 
 function StaleBadge({ days }: { days: number }) {
   return (
