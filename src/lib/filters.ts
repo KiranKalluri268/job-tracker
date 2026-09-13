@@ -13,6 +13,7 @@ export type FilterState = {
   nextFrom: string;
   nextTo: string;
   staleOnly: boolean;
+  starredOnly: boolean;
   sort: SortKey;
   dir: "asc" | "desc";
 };
@@ -27,6 +28,7 @@ export const EMPTY_FILTERS: FilterState = {
   nextFrom: "",
   nextTo: "",
   staleOnly: false,
+  starredOnly: false,
   sort: "updatedAt",
   dir: "desc",
 };
@@ -51,6 +53,7 @@ export function parseFilters(params: ParamSource): FilterState {
     nextFrom: params.get("nextFrom") ?? "",
     nextTo: params.get("nextTo") ?? "",
     staleOnly: params.get("stale") === "1",
+    starredOnly: params.get("starred") === "1",
     sort: SORT_KEYS.includes(sortParam as SortKey) ? (sortParam as SortKey) : "updatedAt",
     dir: dirParam === "asc" ? "asc" : "desc",
   };
@@ -71,6 +74,7 @@ export function toSearchParams(f: FilterState): URLSearchParams {
   if (f.nextFrom) p.set("nextFrom", f.nextFrom);
   if (f.nextTo) p.set("nextTo", f.nextTo);
   if (f.staleOnly) p.set("stale", "1");
+  if (f.starredOnly) p.set("starred", "1");
   if (f.sort !== "updatedAt") p.set("sort", f.sort);
   if (f.dir !== "desc") p.set("dir", f.dir);
   return p;
@@ -85,6 +89,7 @@ export function activeFilterCount(f: FilterState): number {
   if (f.appliedFrom || f.appliedTo) n += 1;
   if (f.nextFrom || f.nextTo) n += 1;
   if (f.staleOnly) n += 1;
+  if (f.starredOnly) n += 1;
   return n;
 }
 
@@ -122,6 +127,8 @@ export function buildMongoFilter(f: FilterState, now: Date = new Date()): Record
   };
   range("appliedOn", f.appliedFrom, f.appliedTo);
   range("nextActionOn", f.nextFrom, f.nextTo);
+
+  if (f.starredOnly) and.push({ starred: true });
 
   if (f.staleOnly) {
     // Each status has its own quiet threshold, so "stale" is a union of one clause

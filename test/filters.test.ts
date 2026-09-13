@@ -94,6 +94,11 @@ describe("buildMongoFilter", () => {
     expect(q.$and[0]).toEqual({ appliedOn: { $gte: "2026-01-01" } });
   });
 
+  it("filters to starred applications only", () => {
+    const q = buildMongoFilter({ ...EMPTY_FILTERS, starredOnly: true }) as { $and: Record<string, unknown>[] };
+    expect(q.$and[0]).toEqual({ starred: true });
+  });
+
   it("expands staleOnly into one cutoff per status that can go quiet", () => {
     const now = new Date("2026-03-01T00:00:00.000Z");
     const q = buildMongoFilter({ ...EMPTY_FILTERS, staleOnly: true }, now) as {

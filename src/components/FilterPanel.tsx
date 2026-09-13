@@ -129,6 +129,16 @@ export default function FilterPanel({ filters, onChange, onClose }: FilterPanelP
           />
           Only ones that have gone quiet
         </label>
+
+        <label className="flex items-center gap-2.5 text-sm text-stone-600">
+          <input
+            type="checkbox"
+            className="size-4 accent-indigo-500"
+            checked={filters.starredOnly}
+            onChange={(e) => patch({ starredOnly: e.target.checked })}
+          />
+          Starred only
+        </label>
       </div>
 
       <div className="mt-4 flex justify-between gap-2 border-t border-[var(--color-edge)] pt-3">
