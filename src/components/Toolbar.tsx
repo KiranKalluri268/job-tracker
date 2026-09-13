@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { activeFilterCount, toSearchParams, type FilterState } from "@/lib/filters";
 
 import FilterPanel from "./FilterPanel";
-import { buttonClass, inputClass, primaryButtonClass } from "./ui";
+import { Spinner, buttonClass, inputClass, primaryButtonClass } from "./ui";
 
 export type ToolbarProps = {
   filters: FilterState;
@@ -69,7 +69,7 @@ export default function Toolbar({ filters, onChange, onAdd, refreshing }: Toolba
           className={`${inputClass} pr-16`}
         />
         {refreshing ? (
-          <span className="absolute top-1/2 right-3 -translate-y-1/2 text-xs text-stone-500">…</span>
+          <Spinner className="absolute top-1/2 right-3 -translate-y-1/2" />
         ) : null}
       </div>
 
@@ -78,6 +78,7 @@ export default function Toolbar({ filters, onChange, onAdd, refreshing }: Toolba
           type="button"
           onClick={() => setPanelOpen((v) => !v)}
           aria-expanded={panelOpen}
+          aria-busy={refreshing}
           className={buttonClass}
         >
           Filter
@@ -86,9 +87,15 @@ export default function Toolbar({ filters, onChange, onAdd, refreshing }: Toolba
               {activeCount}
             </span>
           ) : null}
+          {refreshing ? <Spinner /> : null}
         </button>
         {panelOpen ? (
-          <FilterPanel filters={filters} onChange={onChange} onClose={() => setPanelOpen(false)} />
+          <FilterPanel
+            filters={filters}
+            onChange={onChange}
+            onClose={() => setPanelOpen(false)}
+            refreshing={refreshing}
+          />
         ) : null}
       </div>
 

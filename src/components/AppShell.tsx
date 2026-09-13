@@ -430,22 +430,27 @@ export default function AppShell({
         refreshing={refreshing}
       />
 
-      <ApplicationTable
-        applications={apps}
-        sort={filters.sort}
-        dir={filters.dir}
-        expandedId={expandedId}
-        canEdit={canEdit}
-        now={now}
-        onSort={onSort}
-        onToggleExpand={onToggleExpand}
-        onApply={onQuickApply}
-        onToggleStar={onToggleStar}
-        onStatusChange={onStatusChange}
-        onStatusAdvance={onStatusAdvance}
-        onRowSaved={onRowSaved}
-        onRowDeleted={onDeleted}
-      />
+      <div
+        aria-busy={refreshing}
+        className={`transition-opacity ${refreshing ? "pointer-events-none opacity-60" : ""}`}
+      >
+        <ApplicationTable
+          applications={apps}
+          sort={filters.sort}
+          dir={filters.dir}
+          expandedId={expandedId}
+          canEdit={canEdit}
+          now={now}
+          onSort={onSort}
+          onToggleExpand={onToggleExpand}
+          onApply={onQuickApply}
+          onToggleStar={onToggleStar}
+          onStatusChange={onStatusChange}
+          onStatusAdvance={onStatusAdvance}
+          onRowSaved={onRowSaved}
+          onRowDeleted={onDeleted}
+        />
+      </div>
 
       {creating ? (
         <ApplicationModal

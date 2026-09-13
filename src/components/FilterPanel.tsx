@@ -3,7 +3,7 @@
 import { EMPTY_FILTERS, type FilterState } from "@/lib/filters";
 import { STATUSES, WORK_MODES, type Status, type WorkMode } from "@/lib/types";
 
-import { Field, buttonClass, inputClass } from "./ui";
+import { Field, Spinner, buttonClass, inputClass } from "./ui";
 
 function toggle<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -38,13 +38,21 @@ export type FilterPanelProps = {
   filters: FilterState;
   onChange: (next: FilterState) => void;
   onClose: () => void;
+  /** True while a filter change is being applied against the server. */
+  refreshing?: boolean;
 };
 
-export default function FilterPanel({ filters, onChange, onClose }: FilterPanelProps) {
+export default function FilterPanel({ filters, onChange, onClose, refreshing }: FilterPanelProps) {
   const patch = (p: Partial<FilterState>) => onChange({ ...filters, ...p });
 
   return (
     <div className="absolute top-full right-0 z-40 mt-2 w-[min(92vw,32rem)] rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-4 shadow-2xl">
+      {refreshing ? (
+        <div className="mb-3 flex items-center gap-2 text-xs font-medium text-indigo-600">
+          <Spinner />
+          Updating results…
+        </div>
+      ) : null}
       <div className="space-y-4">
         <div>
           <p className="mb-2 text-xs font-medium tracking-wide text-stone-500 uppercase">Status</p>
