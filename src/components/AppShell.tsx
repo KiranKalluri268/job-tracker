@@ -396,8 +396,8 @@ export default function AppShell({
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-semibold text-stone-800">Job Tracker</h1>
         {userEmail ? (
-          <span className="flex items-center gap-3 text-xs text-stone-500">
-            {userEmail}
+          <span className="flex max-w-full flex-wrap items-center gap-3 text-xs text-stone-500">
+            <span className="max-w-[60vw] truncate sm:max-w-none">{userEmail}</span>
             {!canEdit ? (
               <span className="rounded-full bg-stone-500/12 px-2 py-0.5 font-medium text-stone-600 ring-1 ring-stone-500/25 ring-inset">
                 view only

@@ -137,6 +137,25 @@ function ApplyButton({
 }
 
 /**
+ * The role label, linked to the posting URL when there is one. Stops propagation
+ * so opening the posting doesn't also toggle the row's expansion.
+ */
+function RoleLabel({ app, className }: { app: Application; className?: string }) {
+  if (!app.postingUrl) return <span className={className}>{app.role}</span>;
+  return (
+    <a
+      href={app.postingUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className={`text-blue-600 underline-offset-2 hover:underline ${className ?? ""}`}
+    >
+      {app.role}
+    </a>
+  );
+}
+
+/**
  * Toggles the application's starred flag. Stops propagation so it doesn't also
  * toggle the row's expansion.
  */
@@ -260,7 +279,7 @@ export default function ApplicationTable({
             </div>
           </td>
           <td className="px-4 py-3 text-stone-600">
-            {a.role}
+            <RoleLabel app={a} />
             {a.location ? <span className="block text-xs text-stone-500">{a.location}</span> : null}
           </td>
           <td className="px-4 py-3">
@@ -312,25 +331,36 @@ export default function ApplicationTable({
           expanded ? "border-indigo-500/40" : "border-[var(--color-edge)]"
         }`}
       >
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => onToggleExpand(a)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onToggleExpand(a);
+            }
+          }}
           className="w-full bg-[var(--color-panel)] px-4 py-3 text-left transition active:bg-black/5"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate font-medium text-stone-800">{a.company}</p>
-              <p className="truncate text-sm text-stone-500">{a.role}</p>
+              <p className="truncate text-sm text-stone-500">
+                <RoleLabel app={a} />
+              </p>
             </div>
-            <StatusPill status={a.status} />
+            <StatusCell app={a} canEdit={canEdit} onStatusChange={onStatusChange} />
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500">
-            <span>Applied {shortDate(a.appliedOn)}</span>
-            {a.nextActionOn ? <span>· Next {shortDate(a.nextActionOn)}</span> : null}
+            {a.appliedOn ? <span>Applied {shortDate(a.appliedOn)}</span> : null}
+            {a.nextActionOn ? (
+              <span>{a.appliedOn ? "· " : ""}Next {shortDate(a.nextActionOn)}</span>
+            ) : null}
             {isActionDue(a, now) ? <DueBadge /> : null}
             {isStale(a, now) ? <StaleBadge days={quietDays(a, now)} /> : null}
           </div>
-        </button>
+        </div>
         {expanded ? (
           <ApplicationRowDetail
             key={a._id}
