@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { parseFilters, toSearchParams, type FilterState, type SortKey } from "@/lib/filters";
-import type { Application, Status } from "@/lib/types";
+import type { Application, Priority, Status } from "@/lib/types";
 
 import { draftOf, payloadOf } from "./applicationDraft";
 import ApplicationModal from "./ApplicationModal";
@@ -336,6 +336,30 @@ export default function AppShell({
     [patchApp, pushHistory, addToast, undoToastAction],
   );
 
+  // Inline priority switch from the table. Optimistic, reconciled against the
+  // server response, rolled back on failure, and undoable, same as status.
+  const onPriorityChange = useCallback(
+    (app: Application, priority: Priority) => {
+      const opt = (p: Priority) => (a: Application) => ({ ...a, priority: p });
+      patchApp(app._id, { priority }, opt(priority))
+        .then(() => {
+          pushHistory({
+            label: "priority change",
+            undo: () => patchApp(app._id, { priority: app.priority }, opt(app.priority)),
+            redo: () => patchApp(app._id, { priority }, opt(priority)),
+          });
+          addToast(`Priority set to ${priority}`, {
+            source: `priority:${app._id}`,
+            action: undoToastAction,
+          });
+        })
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : "Could not update application");
+        });
+    },
+    [patchApp, pushHistory, addToast, undoToastAction],
+  );
+
   // Inline edit-save from the expanded row. RowDetail has already written the row;
   // here we merge it and record an undo that PATCHes every field back to how it
   // was, with redo re-applying the saved values.
@@ -446,6 +470,7 @@ export default function AppShell({
           onApply={onQuickApply}
           onToggleStar={onToggleStar}
           onStatusChange={onStatusChange}
+          onPriorityChange={onPriorityChange}
           onStatusAdvance={onStatusAdvance}
           onRowSaved={onRowSaved}
           onRowDeleted={onDeleted}

@@ -5,17 +5,18 @@ import { Fragment, useState } from "react";
 import { shortDate } from "@/lib/dates";
 import type { SortKey } from "@/lib/filters";
 import { isActionDue, isStale, quietDays } from "@/lib/stale";
-import type { Application, Status } from "@/lib/types";
-import { RESPONDED, STATUSES } from "@/lib/types";
+import type { Application, Priority, Status } from "@/lib/types";
+import { PRIORITIES, RESPONDED, STATUSES, priorityRank } from "@/lib/types";
 
 import ApplicationRowDetail from "./ApplicationRowDetail";
-import { StatusPill, inputClass } from "./ui";
+import { PriorityPill, StatusPill, inputClass } from "./ui";
 
 const COLUMNS: { key: SortKey | null; label: string; className?: string }[] = [
   { key: null, label: "" },
   { key: "company", label: "Company" },
   { key: null, label: "Role" },
   { key: "status", label: "Status" },
+  { key: null, label: "Priority" },
   { key: "appliedOn", label: "Applied" },
   { key: "nextActionOn", label: "Next action" },
   { key: null, label: "Source" },
@@ -100,6 +101,62 @@ function StatusCell({
       {STATUSES.map((s) => (
         <option key={s} value={s}>
           {s}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * The priority cell: a pill until clicked, then an inline <select> that switches
+ * the priority straight away. Mirrors StatusCell's click-to-edit interaction.
+ */
+function PriorityCell({
+  app,
+  canEdit,
+  onPriorityChange,
+}: {
+  app: Application;
+  canEdit: boolean;
+  onPriorityChange: (app: Application, priority: Priority) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!canEdit) return <PriorityPill priority={app.priority} />;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40"
+        aria-label={`Change priority, currently ${app.priority}`}
+      >
+        <PriorityPill priority={app.priority} />
+      </button>
+    );
+  }
+
+  return (
+    <select
+      autoFocus
+      className={`${inputClass} w-auto py-1`}
+      value={app.priority}
+      onClick={(e) => e.stopPropagation()}
+      onBlur={() => setOpen(false)}
+      onChange={(e) => {
+        e.stopPropagation();
+        const next = e.target.value as Priority;
+        setOpen(false);
+        if (next !== app.priority) onPriorityChange(app, next);
+      }}
+    >
+      {PRIORITIES.map((p) => (
+        <option key={p} value={p}>
+          {p}
         </option>
       ))}
     </select>
@@ -195,6 +252,7 @@ export type TableProps = {
   onApply: (app: Application) => void;
   onToggleStar: (app: Application) => void;
   onStatusChange: (app: Application, status: Status) => void;
+  onPriorityChange: (app: Application, priority: Priority) => void;
   onStatusAdvance: (app: Application, status: Status) => void;
   onRowSaved: (app: Application) => void;
   onRowDeleted: (id: string) => void;
@@ -212,6 +270,7 @@ export default function ApplicationTable({
   onApply,
   onToggleStar,
   onStatusChange,
+  onPriorityChange,
   onStatusAdvance,
   onRowSaved,
   onRowDeleted,
@@ -232,11 +291,16 @@ export default function ApplicationTable({
 
   const arrow = (key: SortKey | null) => (key && key === sort ? (dir === "asc" ? " ↑" : " ↓") : "");
 
-  // The list arrives already sorted and filtered. Splitting it here keeps each
-  // table sorted and filtered on its own — an archived row never sorts up among
-  // the live ones, and vice versa.
-  const live = applications.filter((a) => !ARCHIVED_STATUSES.includes(a.status));
-  const archived = applications.filter((a) => ARCHIVED_STATUSES.includes(a.status));
+  // The list arrives already sorted and filtered by the chosen column. On top of
+  // that, rows always bucket by starred+priority first — starred-high, then
+  // high, then starred-low, then low — with the chosen sort breaking ties within
+  // each bucket (Array#sort is stable, so this only reorders across buckets).
+  const byPriority = [...applications].sort((a, b) => priorityRank(a) - priorityRank(b));
+
+  // Splitting here keeps each table sorted and filtered on its own — an archived
+  // row never sorts up among the live ones, and vice versa.
+  const live = byPriority.filter((a) => !ARCHIVED_STATUSES.includes(a.status));
+  const archived = byPriority.filter((a) => ARCHIVED_STATUSES.includes(a.status));
 
   // The live rows split three ways, in the order they appear down the table:
   //   1. not applied yet ("Saved")
@@ -284,6 +348,9 @@ export default function ApplicationTable({
           </td>
           <td className="px-4 py-3">
             <StatusCell app={a} canEdit={canEdit} onStatusChange={onStatusChange} />
+          </td>
+          <td className="px-4 py-3">
+            <PriorityCell app={a} canEdit={canEdit} onPriorityChange={onPriorityChange} />
           </td>
           <td className="px-4 py-3 text-stone-500">{shortDate(a.appliedOn)}</td>
           <td className="px-4 py-3">
@@ -350,7 +417,10 @@ export default function ApplicationTable({
                 <RoleLabel app={a} />
               </p>
             </div>
-            <StatusCell app={a} canEdit={canEdit} onStatusChange={onStatusChange} />
+            <div className="flex flex-col items-end gap-1">
+              <StatusCell app={a} canEdit={canEdit} onStatusChange={onStatusChange} />
+              <PriorityCell app={a} canEdit={canEdit} onPriorityChange={onPriorityChange} />
+            </div>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500">
             {a.appliedOn ? <span>Applied {shortDate(a.appliedOn)}</span> : null}
