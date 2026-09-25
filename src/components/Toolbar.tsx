@@ -13,9 +13,19 @@ export type ToolbarProps = {
   /** Omitted for view-only users, who get no "Add" button. */
   onAdd?: () => void;
   refreshing: boolean;
+  /** Whether the triage bookmark (Saved jobs only) is turned on. */
+  bookmarkMode: boolean;
+  onToggleBookmark: () => void;
 };
 
-export default function Toolbar({ filters, onChange, onAdd, refreshing }: ToolbarProps) {
+export default function Toolbar({
+  filters,
+  onChange,
+  onAdd,
+  refreshing,
+  bookmarkMode,
+  onToggleBookmark,
+}: ToolbarProps) {
   // The input is uncontrolled-ish: it echoes keystrokes instantly and only pushes to
   // the URL after a pause, so typing never waits on a round trip.
   const [text, setText] = useState(filters.q);
@@ -98,6 +108,20 @@ export default function Toolbar({ filters, onChange, onAdd, refreshing }: Toolba
           />
         ) : null}
       </div>
+
+      <button
+        type="button"
+        onClick={onToggleBookmark}
+        aria-pressed={bookmarkMode}
+        title="Track a movable bookmark through Saved jobs, sorted by posting date within each star/priority tier"
+        className={
+          bookmarkMode
+            ? "inline-flex items-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/15 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-500/20"
+            : buttonClass
+        }
+      >
+        🔖 Bookmark
+      </button>
 
       {/* A plain link so the browser handles the download and the CSV inherits the
           current filters straight from the URL. */}

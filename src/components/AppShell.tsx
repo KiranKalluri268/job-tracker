@@ -60,6 +60,28 @@ export default function AppShell({
   // table, so all the table needs from here is which row is expanded.
   const [creating, setCreating] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Whether the triage bookmark (Saved jobs, sorted by posting date within each
+  // star/priority tier) is turned on. Sticks across reloads, but only on this
+  // device — it's a personal triage aid, not shared state.
+  const [bookmarkMode, setBookmarkMode] = useState(() => {
+    try {
+      return localStorage.getItem("jobTracker.bookmarkMode") === "1";
+    } catch {
+      // localStorage may be unavailable (SSR, private mode, disabled storage); default to off.
+      return false;
+    }
+  });
+  const onToggleBookmark = useCallback(() => {
+    setBookmarkMode((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem("jobTracker.bookmarkMode", next ? "1" : "0");
+      } catch {
+        /* Nothing to fall back to — the toggle just won't survive a reload. */
+      }
+      return next;
+    });
+  }, []);
 
   const history = useHistory();
   const { push: pushHistory, undo: undoHistory, redo: redoHistory } = history;
@@ -452,6 +474,8 @@ export default function AppShell({
         onChange={applyFilters}
         onAdd={canEdit ? () => setCreating(true) : undefined}
         refreshing={refreshing}
+        bookmarkMode={bookmarkMode}
+        onToggleBookmark={onToggleBookmark}
       />
 
       <div
@@ -465,6 +489,7 @@ export default function AppShell({
           expandedId={expandedId}
           canEdit={canEdit}
           now={now}
+          bookmarkMode={bookmarkMode}
           onSort={onSort}
           onToggleExpand={onToggleExpand}
           onApply={onQuickApply}

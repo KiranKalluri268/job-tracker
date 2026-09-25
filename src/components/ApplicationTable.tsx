@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import { shortDate } from "@/lib/dates";
 import type { SortKey } from "@/lib/filters";
@@ -241,12 +241,70 @@ function StarButton({
   );
 }
 
+const BOOKMARK_STORAGE_KEY = "jobTracker.bookmarkPosition";
+
+/**
+ * A full-width divider dropped between Saved rows, marking how far triage has
+ * gotten. The arrows move it one row at a time; position is clamped to the
+ * current Saved count so it never floats past either end.
+ */
+function BookmarkDivider({
+  onMoveUp,
+  onMoveDown,
+  atTop,
+  atBottom,
+  colSpan,
+}: {
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  atTop: boolean;
+  atBottom: boolean;
+  colSpan?: number;
+}) {
+  const bar = (
+    <div className="flex items-center gap-2 border-y-2 border-dashed border-indigo-500 bg-indigo-500/10 px-4 py-1">
+      <span className="text-xs font-semibold tracking-wide text-indigo-700 uppercase">Bookmark</span>
+      <span className="flex-1" />
+      <button
+        type="button"
+        onClick={onMoveUp}
+        disabled={atTop}
+        aria-label="Move bookmark up"
+        className="rounded-md px-1.5 text-sm text-indigo-700 transition hover:bg-indigo-500/15 disabled:opacity-30"
+      >
+        ▲
+      </button>
+      <button
+        type="button"
+        onClick={onMoveDown}
+        disabled={atBottom}
+        aria-label="Move bookmark down"
+        className="rounded-md px-1.5 text-sm text-indigo-700 transition hover:bg-indigo-500/15 disabled:opacity-30"
+      >
+        ▼
+      </button>
+    </div>
+  );
+
+  if (colSpan === undefined) return <li aria-hidden={false}>{bar}</li>;
+  return (
+    <tr aria-hidden={false}>
+      <td colSpan={colSpan} className="p-0">
+        {bar}
+      </td>
+    </tr>
+  );
+}
+
 export type TableProps = {
   applications: Application[];
   sort: SortKey;
   dir: "asc" | "desc";
   expandedId: string | null;
   canEdit: boolean;
+  /** Sorts Saved jobs by posting date within each star/priority tier and shows
+   *  the movable triage bookmark among them. */
+  bookmarkMode: boolean;
   onSort: (key: SortKey) => void;
   onToggleExpand: (app: Application) => void;
   onApply: (app: Application) => void;
@@ -265,6 +323,7 @@ export default function ApplicationTable({
   dir,
   expandedId,
   canEdit,
+  bookmarkMode,
   onSort,
   onToggleExpand,
   onApply,
@@ -277,6 +336,27 @@ export default function ApplicationTable({
   now,
 }: TableProps) {
   const [showClosed, setShowClosed] = useState(false);
+
+  // Where the bookmark sits among Saved rows, as an index into that group (0 =
+  // above the first row, length = below the last). Persisted so it survives a
+  // reload; clamped against the current Saved count on every render since that
+  // count can shrink out from under a stale stored value.
+  const [bookmarkPos, setBookmarkPos] = useState(() => {
+    try {
+      const stored = Number(localStorage.getItem(BOOKMARK_STORAGE_KEY));
+      return Number.isFinite(stored) && stored >= 0 ? stored : 0;
+    } catch {
+      // localStorage may be unavailable (SSR, private mode, disabled storage).
+      return 0;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(BOOKMARK_STORAGE_KEY, String(bookmarkPos));
+    } catch {
+      /* Nothing to fall back to — the position just won't survive a reload. */
+    }
+  }, [bookmarkPos]);
 
   if (!applications.length) {
     return (
@@ -306,9 +386,23 @@ export default function ApplicationTable({
   //   1. not applied yet ("Saved")
   //   2. applied and the company came back (RESPONDED)
   //   3. applied, still waiting — the pool that eventually goes Ghosted
-  const notApplied = live.filter((a) => a.status === "Saved");
+  let notApplied = live.filter((a) => a.status === "Saved");
   const responded = live.filter((a) => a.status !== "Saved" && RESPONDED.includes(a.status));
   const awaiting = live.filter((a) => a.status !== "Saved" && !RESPONDED.includes(a.status));
+
+  // Bookmark mode re-sorts just the Saved queue by posting date within each
+  // star/priority tier — the order you actually want to apply in — and shows
+  // where triage has gotten to.
+  if (bookmarkMode) {
+    notApplied = [...notApplied].sort(
+      (a, b) => priorityRank(a) - priorityRank(b) || a.createdAt.localeCompare(b.createdAt),
+    );
+  }
+  const showBookmark = bookmarkMode && notApplied.length > 0;
+  const clampedBookmarkPos = Math.min(bookmarkPos, notApplied.length);
+  const moveBookmark = (delta: number) =>
+    setBookmarkPos(Math.max(0, Math.min(notApplied.length, clampedBookmarkPos + delta)));
+
   const liveGroups = [notApplied, responded, awaiting].filter((g) => g.length);
 
   const desktopRow = (a: Application) => {
@@ -455,6 +549,72 @@ export default function ApplicationTable({
     );
   };
 
+  // Interleaves the bookmark divider into the Saved group's rows at its current
+  // position; every other group renders as-is.
+  const desktopGroupRows = (group: Application[]) => {
+    if (group !== notApplied || !showBookmark) return group.map(desktopRow);
+    const rows: React.ReactNode[] = [];
+    group.forEach((a, idx) => {
+      if (idx === clampedBookmarkPos) {
+        rows.push(
+          <BookmarkDivider
+            key="bookmark"
+            colSpan={COLUMNS.length}
+            onMoveUp={() => moveBookmark(-1)}
+            onMoveDown={() => moveBookmark(1)}
+            atTop={clampedBookmarkPos === 0}
+            atBottom={clampedBookmarkPos === notApplied.length}
+          />,
+        );
+      }
+      rows.push(desktopRow(a));
+    });
+    if (clampedBookmarkPos === group.length) {
+      rows.push(
+        <BookmarkDivider
+          key="bookmark"
+          colSpan={COLUMNS.length}
+          onMoveUp={() => moveBookmark(-1)}
+          onMoveDown={() => moveBookmark(1)}
+          atTop={clampedBookmarkPos === 0}
+          atBottom
+        />,
+      );
+    }
+    return rows;
+  };
+
+  const mobileGroupItems = (group: Application[]) => {
+    if (group !== notApplied || !showBookmark) return group.map(mobileCard);
+    const items: React.ReactNode[] = [];
+    group.forEach((a, idx) => {
+      if (idx === clampedBookmarkPos) {
+        items.push(
+          <BookmarkDivider
+            key="bookmark"
+            onMoveUp={() => moveBookmark(-1)}
+            onMoveDown={() => moveBookmark(1)}
+            atTop={clampedBookmarkPos === 0}
+            atBottom={clampedBookmarkPos === notApplied.length}
+          />,
+        );
+      }
+      items.push(mobileCard(a));
+    });
+    if (clampedBookmarkPos === group.length) {
+      items.push(
+        <BookmarkDivider
+          key="bookmark"
+          onMoveUp={() => moveBookmark(-1)}
+          onMoveDown={() => moveBookmark(1)}
+          atTop={clampedBookmarkPos === 0}
+          atBottom
+        />,
+      );
+    }
+    return items;
+  };
+
   return (
     <>
       {/* Desktop: a real table. Archived rows sit in a second <tbody> so the
@@ -493,7 +653,7 @@ export default function ApplicationTable({
                   <td colSpan={COLUMNS.length} className="h-4 bg-[var(--color-ink)]" />
                 </tr>
               ) : null}
-              {group.map(desktopRow)}
+              {desktopGroupRows(group)}
             </tbody>
           ))}
         </table>
@@ -502,7 +662,7 @@ export default function ApplicationTable({
       {/* Mobile: the same live rows as stacked cards. */}
       {liveGroups.map((group, i) => (
         <ul key={i} className={`space-y-2 md:hidden ${i > 0 ? "mt-6" : ""}`}>
-          {group.map(mobileCard)}
+          {mobileGroupItems(group)}
         </ul>
       ))}
 
