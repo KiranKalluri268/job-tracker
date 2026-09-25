@@ -46,7 +46,7 @@ export default function FilterPanel({ filters, onChange, onClose, refreshing }: 
   const patch = (p: Partial<FilterState>) => onChange({ ...filters, ...p });
 
   return (
-    <div className="absolute top-full right-0 z-40 mt-2 w-[min(92vw,32rem)] rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-4 shadow-2xl">
+    <div className="fixed inset-x-4 top-20 z-40 max-h-[80vh] w-auto overflow-y-auto rounded-xl border border-[var(--color-edge)] bg-[var(--color-panel)] p-4 shadow-2xl sm:absolute sm:inset-x-auto sm:top-full sm:right-0 sm:mt-2 sm:max-h-none sm:w-[min(92vw,32rem)]">
       {refreshing ? (
         <div className="mb-3 flex items-center gap-2 text-xs font-medium text-indigo-600">
           <Spinner />

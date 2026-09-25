@@ -19,6 +19,7 @@ body {
   color: #2b2a26;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 /* A slim scrollbar so the table's horizontal overflow doesn't eat a row of height. */
