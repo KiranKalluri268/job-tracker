@@ -137,6 +137,25 @@ function ApplyButton({
 }
 
 /**
+ * The role label, linked to the posting URL when there is one. Stops propagation
+ * so opening the posting doesn't also toggle the row's expansion.
+ */
+function RoleLabel({ app, className }: { app: Application; className?: string }) {
+  if (!app.postingUrl) return <span className={className}>{app.role}</span>;
+  return (
+    <a
+      href={app.postingUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className={`text-blue-600 underline-offset-2 hover:underline ${className ?? ""}`}
+    >
+      {app.role}
+    </a>
+  );
+}
+
+/**
  * Toggles the application's starred flag. Stops propagation so it doesn't also
  * toggle the row's expansion.
  */
@@ -260,7 +279,7 @@ export default function ApplicationTable({
             </div>
           </td>
           <td className="px-4 py-3 text-stone-600">
-            {a.role}
+            <RoleLabel app={a} />
             {a.location ? <span className="block text-xs text-stone-500">{a.location}</span> : null}
           </td>
           <td className="px-4 py-3">
