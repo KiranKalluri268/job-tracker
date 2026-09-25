@@ -6,6 +6,7 @@ const COLUMNS: Column[] = [
   { header: "Company", get: (a) => a.company },
   { header: "Role", get: (a) => a.role },
   { header: "Status", get: (a) => a.status },
+  { header: "Priority", get: (a) => a.priority },
   { header: "Applied On", get: (a) => a.appliedOn ?? "" },
   { header: "Next Action", get: (a) => a.nextActionOn ?? "" },
   { header: "Next Action Note", get: (a) => a.nextActionNote ?? "" },
