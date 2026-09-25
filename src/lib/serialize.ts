@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 
 import type { Application, ApplicationInput, Status } from "./types";
-import { isStatus, isWorkMode } from "./types";
+import { isPriority, isStatus, isWorkMode } from "./types";
 
 /** Fields the client is allowed to write. Anything else in the body is ignored. */
 const TEXT_FIELDS = [
@@ -60,6 +60,10 @@ export function sanitizeInput(body: unknown, { requireCore }: { requireCore: boo
     if (!isStatus(raw.status)) throw new ValidationError(`Unknown status "${String(raw.status)}"`);
     out.status = raw.status;
   }
+  if ("priority" in raw) {
+    if (!isPriority(raw.priority)) throw new ValidationError(`Unknown priority "${String(raw.priority)}"`);
+    out.priority = raw.priority;
+  }
   if ("workMode" in raw) {
     const mode = cleanText(raw.workMode);
     if (mode !== null && !isWorkMode(mode)) {
@@ -88,6 +92,7 @@ export function newDocument(input: ApplicationInput, now = new Date()): Record<s
     company: input.company,
     role: input.role,
     status,
+    priority: input.priority ?? "low",
     starred: input.starred ?? false,
     appliedOn,
     nextActionOn: input.nextActionOn ?? null,
@@ -121,5 +126,7 @@ export function serialize(doc: Record<string, unknown>): Application {
     _id: String(_id),
     // Older documents predate this field; treat a missing value as unstarred.
     starred: Boolean(rest.starred),
+    // Older documents predate priority too; default them to "low".
+    priority: isPriority(rest.priority) ? rest.priority : "low",
   };
 }
