@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import { shortDate } from "@/lib/dates";
 import type { SortKey } from "@/lib/filters";
@@ -245,24 +245,50 @@ const BOOKMARK_STORAGE_KEY = "jobTracker.bookmarkPosition";
 
 /**
  * A full-width divider dropped between Saved rows, marking how far triage has
- * gotten. The arrows move it one row at a time; position is clamped to the
+ * gotten. It can be dragged by its handle for smooth, continuous movement, or
+ * nudged one row at a time with the arrows; position is clamped to the
  * current Saved count so it never floats past either end.
  */
 function BookmarkDivider({
   onMoveUp,
   onMoveDown,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  dragging,
   atTop,
   atBottom,
   colSpan,
 }: {
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onDragStart: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onDragMove: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onDragEnd: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  dragging: boolean;
   atTop: boolean;
   atBottom: boolean;
   colSpan?: number;
 }) {
   const bar = (
-    <div className="flex items-center gap-2 border-y-2 border-dashed border-indigo-500 bg-indigo-500/10 px-4 py-1">
+    <div
+      className={`flex items-center gap-2 border-y-2 border-dashed border-indigo-500 bg-indigo-500/10 px-4 py-1 ${
+        dragging ? "bg-indigo-500/20" : ""
+      }`}
+    >
+      <button
+        type="button"
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+        aria-label="Drag to move bookmark"
+        className={`touch-none rounded-md px-1.5 text-sm text-indigo-700 transition select-none hover:bg-indigo-500/15 ${
+          dragging ? "cursor-grabbing" : "cursor-grab"
+        }`}
+      >
+        ⠿
+      </button>
       <span className="text-xs font-semibold tracking-wide text-indigo-700 uppercase">Bookmark</span>
       <span className="flex-1" />
       <button
@@ -358,6 +384,63 @@ export default function ApplicationTable({
     }
   }, [bookmarkPos]);
 
+  // The bookmark drag reads row positions straight from the DOM rather than
+  // through refs: every Saved row carries a data-bookmark-id attribute, and
+  // drag-start collects them (in document order, which matches notApplied's
+  // order) from whichever table/list contains the handle that was grabbed.
+  // The row list and the latest pointer Y live in refs so a burst of
+  // pointermove events collapses into one state update per animation frame
+  // instead of one per event — mutated only from inside these handlers, never
+  // read during render.
+  const dragEls = useRef<HTMLElement[] | null>(null);
+  const dragY = useRef<number | null>(null);
+  const dragFrame = useRef<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(
+    () => () => {
+      if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+    },
+    [],
+  );
+
+  const startDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    const container = e.currentTarget.closest("table, ul");
+    dragEls.current = container
+      ? Array.from(container.querySelectorAll<HTMLElement>("[data-bookmark-id]"))
+      : [];
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const onDragMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragEls.current) return;
+    dragY.current = e.clientY;
+    if (dragFrame.current !== null) return;
+    dragFrame.current = requestAnimationFrame(() => {
+      dragFrame.current = null;
+      const els = dragEls.current;
+      const y = dragY.current;
+      if (!els || y === null) return;
+      let idx = els.length;
+      for (let i = 0; i < els.length; i++) {
+        const rect = els[i].getBoundingClientRect();
+        if (y < rect.top + rect.height / 2) {
+          idx = i;
+          break;
+        }
+      }
+      setBookmarkPos(idx);
+    });
+  };
+
+  const endDrag = () => {
+    dragEls.current = null;
+    dragY.current = null;
+    setDragging(false);
+  };
+
   if (!applications.length) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--color-edge)] px-6 py-16 text-center">
@@ -411,6 +494,7 @@ export default function ApplicationTable({
     return (
       <Fragment key={a._id}>
         <tr
+          data-bookmark-id={a._id}
           tabIndex={0}
           onClick={() => onToggleExpand(a)}
           onKeyDown={(e) => {
@@ -488,6 +572,7 @@ export default function ApplicationTable({
     return (
       <li
         key={a._id}
+        data-bookmark-id={a._id}
         className={`overflow-hidden rounded-xl border ${
           expanded ? "border-indigo-500/40" : "border-[var(--color-edge)]"
         }`}
@@ -553,15 +638,22 @@ export default function ApplicationTable({
   // position; every other group renders as-is.
   const desktopGroupRows = (group: Application[]) => {
     if (group !== notApplied || !showBookmark) return group.map(desktopRow);
+    const dividerProps = {
+      onMoveUp: () => moveBookmark(-1),
+      onMoveDown: () => moveBookmark(1),
+      onDragStart: startDrag,
+      onDragMove,
+      onDragEnd: endDrag,
+      dragging,
+      colSpan: COLUMNS.length,
+    };
     const rows: React.ReactNode[] = [];
     group.forEach((a, idx) => {
       if (idx === clampedBookmarkPos) {
         rows.push(
           <BookmarkDivider
             key="bookmark"
-            colSpan={COLUMNS.length}
-            onMoveUp={() => moveBookmark(-1)}
-            onMoveDown={() => moveBookmark(1)}
+            {...dividerProps}
             atTop={clampedBookmarkPos === 0}
             atBottom={clampedBookmarkPos === notApplied.length}
           />,
@@ -570,30 +662,28 @@ export default function ApplicationTable({
       rows.push(desktopRow(a));
     });
     if (clampedBookmarkPos === group.length) {
-      rows.push(
-        <BookmarkDivider
-          key="bookmark"
-          colSpan={COLUMNS.length}
-          onMoveUp={() => moveBookmark(-1)}
-          onMoveDown={() => moveBookmark(1)}
-          atTop={clampedBookmarkPos === 0}
-          atBottom
-        />,
-      );
+      rows.push(<BookmarkDivider key="bookmark" {...dividerProps} atTop={clampedBookmarkPos === 0} atBottom />);
     }
     return rows;
   };
 
   const mobileGroupItems = (group: Application[]) => {
     if (group !== notApplied || !showBookmark) return group.map(mobileCard);
+    const dividerProps = {
+      onMoveUp: () => moveBookmark(-1),
+      onMoveDown: () => moveBookmark(1),
+      onDragStart: startDrag,
+      onDragMove,
+      onDragEnd: endDrag,
+      dragging,
+    };
     const items: React.ReactNode[] = [];
     group.forEach((a, idx) => {
       if (idx === clampedBookmarkPos) {
         items.push(
           <BookmarkDivider
             key="bookmark"
-            onMoveUp={() => moveBookmark(-1)}
-            onMoveDown={() => moveBookmark(1)}
+            {...dividerProps}
             atTop={clampedBookmarkPos === 0}
             atBottom={clampedBookmarkPos === notApplied.length}
           />,
@@ -602,15 +692,7 @@ export default function ApplicationTable({
       items.push(mobileCard(a));
     });
     if (clampedBookmarkPos === group.length) {
-      items.push(
-        <BookmarkDivider
-          key="bookmark"
-          onMoveUp={() => moveBookmark(-1)}
-          onMoveDown={() => moveBookmark(1)}
-          atTop={clampedBookmarkPos === 0}
-          atBottom
-        />,
-      );
+      items.push(<BookmarkDivider key="bookmark" {...dividerProps} atTop={clampedBookmarkPos === 0} atBottom />);
     }
     return items;
   };
