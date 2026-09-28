@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { activeFilterCount, toSearchParams, type FilterState } from "@/lib/filters";
+import { EMPTY_FILTERS, activeFilterCount, toSearchParams, type FilterState } from "@/lib/filters";
 
 import FilterPanel from "./FilterPanel";
 import { Spinner, buttonClass, inputClass, primaryButtonClass } from "./ui";
@@ -13,19 +13,9 @@ export type ToolbarProps = {
   /** Omitted for view-only users, who get no "Add" button. */
   onAdd?: () => void;
   refreshing: boolean;
-  /** Whether the triage bookmark (Saved jobs only) is turned on. */
-  bookmarkMode: boolean;
-  onToggleBookmark: () => void;
 };
 
-export default function Toolbar({
-  filters,
-  onChange,
-  onAdd,
-  refreshing,
-  bookmarkMode,
-  onToggleBookmark,
-}: ToolbarProps) {
+export default function Toolbar({ filters, onChange, onAdd, refreshing }: ToolbarProps) {
   // The input is uncontrolled-ish: it echoes keystrokes instantly and only pushes to
   // the URL after a pause, so typing never waits on a round trip.
   const [text, setText] = useState(filters.q);
@@ -66,6 +56,13 @@ export default function Toolbar({
   }, [panelOpen]);
 
   const exportHref = `/api/applications/export?${toSearchParams(filters).toString()}`;
+  const defaultSort = filters.sort === "default";
+  const toggleDefaultSort = () =>
+    onChange(
+      defaultSort
+        ? { ...filters, sort: EMPTY_FILTERS.sort, dir: EMPTY_FILTERS.dir }
+        : { ...filters, sort: "default", dir: "asc" },
+    );
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -111,16 +108,16 @@ export default function Toolbar({
 
       <button
         type="button"
-        onClick={onToggleBookmark}
-        aria-pressed={bookmarkMode}
-        title="Track a movable bookmark through Saved jobs, sorted by posting date within each star/priority tier"
+        onClick={toggleDefaultSort}
+        aria-pressed={defaultSort}
+        title="Sort by triage order: starred+high first, then high, then starred+low, then low, oldest posting first within each tier"
         className={
-          bookmarkMode
+          defaultSort
             ? "inline-flex items-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/15 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-500/20"
             : buttonClass
         }
       >
-        🔖 Bookmark
+        Default
       </button>
 
       {/* A plain link so the browser handles the download and the CSV inherits the

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { parseFilters, toSearchParams, type FilterState, type SortKey } from "@/lib/filters";
+import { parseFilters, toSearchParams, type Cursor, type FilterState, type SortKey } from "@/lib/filters";
 import type { Application, Priority, Status } from "@/lib/types";
 
 import { draftOf, payloadOf } from "./applicationDraft";
@@ -18,6 +18,8 @@ import { useNow } from "./useNow";
 
 export type AppShellProps = {
   initialApplications: Application[];
+  /** Keyset cursor for the row after the server's first page, or null if that page was everything. */
+  initialCursor: Cursor<string> | null;
   initialError: string | null;
   userEmail: string | null;
   /** Admins get the editing controls; viewers get a read-only table. */
@@ -28,16 +30,26 @@ export type AppShellProps = {
   serverNow: number;
 };
 
-/** Every application, ignoring the current filters. */
-async function fetchAll(): Promise<Application[]> {
-  const res = await fetch("/api/applications");
+type Page = { list: Application[]; nextCursor: Cursor<string> | null };
+
+/** One page of applications matching `query` (a URL search-param string), starting after `cursor`. */
+async function fetchPage(query: string, cursor: Cursor<string> | null): Promise<Page> {
+  const qs = new URLSearchParams(query);
+  if (cursor) qs.set("cursor", JSON.stringify(cursor));
+  const res = await fetch(`/api/applications?${qs.toString()}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error ?? "Could not load applications");
-  return json.applications as Application[];
+  return { list: json.applications as Application[], nextCursor: (json.nextCursor as Cursor<string>) ?? null };
+}
+
+/** One page of every application, ignoring the current filters, starting after `cursor`. */
+function fetchAllPage(cursor: Cursor<string> | null): Promise<Page> {
+  return fetchPage("", cursor);
 }
 
 export default function AppShell({
   initialApplications,
+  initialCursor,
   initialError,
   userEmail,
   canEdit,
@@ -51,37 +63,18 @@ export default function AppShell({
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
 
   const [apps, setApps] = useState<Application[]>(initialApplications);
+  const [cursor, setCursor] = useState<Cursor<string> | null>(initialCursor);
   // The strip and the overview answer "how is the search going overall", which the
-  // current filter must not distort — so they read an unfiltered copy.
+  // current filter must not distort — so they read an unfiltered copy, fetched and
+  // paginated independently of the (possibly filtered) table above.
   const [allApps, setAllApps] = useState<Application[]>(initialApplications);
+  const [allCursor, setAllCursor] = useState<Cursor<string> | null>(null);
   const [error, setError] = useState<string | null>(initialError);
   const [refreshing, setRefreshing] = useState(false);
   // The create form is still a modal; editing an existing row happens inline in the
   // table, so all the table needs from here is which row is expanded.
   const [creating, setCreating] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  // Whether the triage bookmark (Saved jobs, sorted by posting date within each
-  // star/priority tier) is turned on. Sticks across reloads, but only on this
-  // device — it's a personal triage aid, not shared state.
-  const [bookmarkMode, setBookmarkMode] = useState(() => {
-    try {
-      return localStorage.getItem("jobTracker.bookmarkMode") === "1";
-    } catch {
-      // localStorage may be unavailable (SSR, private mode, disabled storage); default to off.
-      return false;
-    }
-  });
-  const onToggleBookmark = useCallback(() => {
-    setBookmarkMode((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem("jobTracker.bookmarkMode", next ? "1" : "0");
-      } catch {
-        /* Nothing to fall back to — the toggle just won't survive a reload. */
-      }
-      return next;
-    });
-  }, []);
 
   const history = useHistory();
   const { push: pushHistory, undo: undoHistory, redo: redoHistory } = history;
@@ -114,15 +107,11 @@ export default function AppShell({
     }
     const id = ++requestId.current;
     setRefreshing(true);
-    fetch(`/api/applications?${query}`)
-      .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Could not load applications");
-        return json.applications as Application[];
-      })
-      .then((list) => {
+    fetchPage(query, null)
+      .then(({ list, nextCursor }) => {
         if (id !== requestId.current) return;
         setApps(list);
+        setCursor(nextCursor);
         setError(null);
       })
       .catch((err: unknown) => {
@@ -134,13 +123,75 @@ export default function AppShell({
       });
   }, [query]);
 
+  // Keeps pulling pages in the background — via the keyset cursor, not
+  // skip/limit, so each fetch's cost doesn't grow with how far in it is —
+  // until the server says there's nothing left. No "Load more" button: the
+  // whole filtered set fills in on its own once the fast first page has
+  // painted. Guarded by a ref rather than a piece of state, since putting a
+  // "currently loading" flag in this effect's own dependency array made
+  // setting it re-run the effect immediately, before the fetch it started
+  // could resolve.
+  const loadingMoreRef = useRef(false);
+  useEffect(() => {
+    if (!cursor || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    fetchPage(query, cursor)
+      .then(({ list, nextCursor }) => {
+        setApps((prev) => [...prev, ...list]);
+        setCursor(nextCursor);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Could not load applications");
+        setCursor(null);
+      })
+      .finally(() => {
+        loadingMoreRef.current = false;
+      });
+  }, [cursor, query]);
+
+  // The unfiltered stats set walks the whole collection independently, always
+  // starting over from cursor=null — the SSR page's initialApplications may
+  // be a filtered first page (if the URL carries filters), so it can't be
+  // trusted as this set's seed.
+  const loadingAllRef = useRef(false);
   const reloadAll = useCallback(() => {
-    fetchAll()
-      .then(setAllApps)
+    if (loadingAllRef.current) return;
+    loadingAllRef.current = true;
+    fetchAllPage(null)
+      .then(({ list, nextCursor }) => {
+        setAllApps(list);
+        setAllCursor(nextCursor);
+      })
       .catch(() => {
         /* The filtered list already surfaces load failures; don't double-report. */
+      })
+      .finally(() => {
+        loadingAllRef.current = false;
       });
   }, []);
+
+  const allStarted = useRef(false);
+  useEffect(() => {
+    if (allStarted.current) return;
+    allStarted.current = true;
+    reloadAll();
+  }, [reloadAll]);
+
+  useEffect(() => {
+    if (!allCursor || loadingAllRef.current) return;
+    loadingAllRef.current = true;
+    fetchAllPage(allCursor)
+      .then(({ list, nextCursor }) => {
+        setAllApps((prev) => [...prev, ...list]);
+        setAllCursor(nextCursor);
+      })
+      .catch(() => {
+        setAllCursor(null);
+      })
+      .finally(() => {
+        loadingAllRef.current = false;
+      });
+  }, [allCursor]);
 
   const applyFilters = useCallback(
     (next: FilterState) => {
@@ -474,8 +525,6 @@ export default function AppShell({
         onChange={applyFilters}
         onAdd={canEdit ? () => setCreating(true) : undefined}
         refreshing={refreshing}
-        bookmarkMode={bookmarkMode}
-        onToggleBookmark={onToggleBookmark}
       />
 
       <div
@@ -489,7 +538,6 @@ export default function AppShell({
           expandedId={expandedId}
           canEdit={canEdit}
           now={now}
-          bookmarkMode={bookmarkMode}
           onSort={onSort}
           onToggleExpand={onToggleExpand}
           onApply={onQuickApply}

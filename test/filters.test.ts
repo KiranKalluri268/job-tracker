@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   EMPTY_FILTERS,
   activeFilterCount,
+  buildCursorFilter,
   buildMongoFilter,
   buildMongoSort,
   parseFilters,
@@ -115,5 +116,48 @@ describe("buildMongoSort", () => {
   it("maps direction onto Mongo's 1 / -1", () => {
     expect(buildMongoSort({ ...EMPTY_FILTERS, sort: "company", dir: "asc" })).toEqual({ company: 1 });
     expect(buildMongoSort(EMPTY_FILTERS)).toEqual({ updatedAt: -1 });
+  });
+
+  it("expands the 'default' triage sort into its compound key, ignoring dir", () => {
+    expect(buildMongoSort({ ...EMPTY_FILTERS, sort: "default", dir: "desc" })).toEqual({
+      priority: 1,
+      starred: -1,
+      createdAt: 1,
+    });
+  });
+});
+
+describe("buildCursorFilter", () => {
+  it("is null with no cursor", () => {
+    expect(buildCursorFilter(EMPTY_FILTERS, null)).toBeNull();
+  });
+
+  it("builds the standard two-clause $or for a single-field sort", () => {
+    const f = { ...EMPTY_FILTERS, sort: "company" as const, dir: "asc" as const };
+    const cursor = { values: ["Acme"], id: "cursor-id" };
+    expect(buildCursorFilter(f, cursor)).toEqual({
+      $or: [{ company: { $gt: "Acme" } }, { company: "Acme", _id: { $gt: "cursor-id" } }],
+    });
+  });
+
+  it("respects direction for a descending single-field sort", () => {
+    const f = { ...EMPTY_FILTERS, sort: "updatedAt" as const, dir: "desc" as const };
+    const cursor = { values: ["2026-01-01"], id: "cursor-id" };
+    expect(buildCursorFilter(f, cursor)).toEqual({
+      $or: [{ updatedAt: { $lt: "2026-01-01" } }, { updatedAt: "2026-01-01", _id: { $lt: "cursor-id" } }],
+    });
+  });
+
+  it("builds one prefix clause per field of the 'default' compound sort, plus an all-tied tiebreak", () => {
+    const f = { ...EMPTY_FILTERS, sort: "default" as const };
+    const cursor = { values: ["high", true, "2026-01-01"], id: "cursor-id" };
+    expect(buildCursorFilter(f, cursor)).toEqual({
+      $or: [
+        { priority: { $gt: "high" } },
+        { priority: "high", starred: { $lt: true } },
+        { priority: "high", starred: true, createdAt: { $gt: "2026-01-01" } },
+        { priority: "high", starred: true, createdAt: "2026-01-01", _id: { $gt: "cursor-id" } },
+      ],
+    });
   });
 });
