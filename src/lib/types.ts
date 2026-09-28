@@ -1,5 +1,6 @@
 export const STATUSES = [
   "Saved",
+  "Opened",
   "Applied",
   "OA",
   "Interview",
@@ -22,6 +23,9 @@ export type Priority = (typeof PRIORITIES)[number];
 
 /** Statuses that mean the company came back to us in some form. */
 export const RESPONDED: readonly Status[] = ["OA", "Interview", "Offer", "Rejected", "Not qualified"];
+
+/** Statuses that mean an application hasn't gone out yet — still in the triage queue. */
+export const NOT_YET_APPLIED: readonly Status[] = ["Saved", "Opened"];
 
 /** Statuses that mean the application is finished, one way or the other. */
 export const CLOSED: readonly Status[] = [
@@ -71,6 +75,7 @@ export type ApplicationInput = Partial<Omit<Application, "_id" | "events" | "cre
 
 export const STATUS_TONE: Record<Status, string> = {
   Saved: "bg-slate-500/12 text-slate-700 ring-slate-500/25",
+  Opened: "bg-sky-500/12 text-sky-700 ring-sky-500/25",
   Applied: "bg-indigo-500/12 text-indigo-700 ring-indigo-500/25",
   OA: "bg-violet-500/12 text-violet-700 ring-violet-500/25",
   Interview: "bg-amber-500/15 text-amber-800 ring-amber-500/30",

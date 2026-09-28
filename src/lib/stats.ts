@@ -1,5 +1,5 @@
 import { weekStartOf } from "./dates";
-import { RESPONDED, STATUSES, type Application, type Status } from "./types";
+import { NOT_YET_APPLIED, RESPONDED, STATUSES, type Application, type Status } from "./types";
 
 export { weekStartOf };
 
@@ -25,12 +25,14 @@ export type Stats = {
 
 
 /**
- * An application counts as "sent" once it has ever left Saved. Reading the event log
- * rather than the current status means a rejected application still counts as sent.
+ * An application counts as "sent" once it has ever left the pre-apply queue
+ * (Saved or Opened — Opened just means it's been read, not applied to). Reading
+ * the event log rather than the current status means a rejected application
+ * still counts as sent.
  */
 function wasSent(app: Application): boolean {
-  if (app.status !== "Saved") return true;
-  return app.events.some((e) => e.to !== "Saved");
+  if (!NOT_YET_APPLIED.includes(app.status)) return true;
+  return app.events.some((e) => !NOT_YET_APPLIED.includes(e.to));
 }
 
 function firstResponseAt(app: Application): string | null {
