@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { assertCanEdit, errorResponse } from "@/lib/api";
 import { applications } from "@/lib/mongodb";
 import { sanitizeInput, serialize, toObjectId, ValidationError } from "@/lib/serialize";
-import type { AppEvent, Status } from "@/lib/types";
+import { NOT_YET_APPLIED, type AppEvent, type Status } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +35,9 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
         note: typeof body.eventNote === "string" && body.eventNote.trim() ? body.eventNote.trim() : null,
       };
       ops.$push = { events: event };
-      // First time it actually goes out, stamp the applied date if it's still blank.
-      if (next !== "Saved" && !existing.appliedOn && input.appliedOn === undefined) {
+      // First time it actually goes out — leaving Saved/Opened, not just being
+      // opened — stamp the applied date if it's still blank.
+      if (!NOT_YET_APPLIED.includes(next) && !existing.appliedOn && input.appliedOn === undefined) {
         update.appliedOn = now.slice(0, 10);
       }
     }

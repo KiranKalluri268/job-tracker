@@ -48,9 +48,21 @@ export async function applications(): Promise<Collection<ApplicationDoc>> {
   const db = await getDb();
   const col = db.collection<ApplicationDoc>("applications");
   indexesReady ??= Promise.all([
-    col.createIndex({ status: 1 }),
-    col.createIndex({ nextActionOn: 1 }),
-    col.createIndex({ updatedAt: -1 }),
+    // One compound index per sortable field, each paired with `_id` as a
+    // tiebreak — this is what keyset ("cursor") pagination's `$gt`/`$lt`
+    // queries need to stay fast instead of falling back to an in-memory
+    // sort as the collection grows past what fits in one query. A fixed
+    // direction here still serves the opposite direction too: Mongo can
+    // scan any index backwards, and every sort here pairs the field and
+    // `_id` in the same relative direction (see buildMongoSort/pagination.ts).
+    col.createIndex({ status: 1, _id: 1 }),
+    col.createIndex({ nextActionOn: 1, _id: 1 }),
+    col.createIndex({ updatedAt: 1, _id: 1 }),
+    col.createIndex({ createdAt: 1, _id: 1 }),
+    col.createIndex({ appliedOn: 1, _id: 1 }),
+    col.createIndex({ company: 1, _id: 1 }),
+    // Matches the "default" triage sort's compound key exactly (see buildSortSpec).
+    col.createIndex({ priority: 1, starred: -1, createdAt: 1, _id: 1 }),
     col.createIndex({ company: "text", role: "text", notes: "text" }),
   ]).then(() => undefined);
   await indexesReady;

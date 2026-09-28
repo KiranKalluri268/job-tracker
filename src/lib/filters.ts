@@ -1,7 +1,12 @@
 import { STALE_AFTER_DAYS } from "./stale";
 import { isStatus, isWorkMode, type Status, type WorkMode } from "./types";
 
-export type SortKey = "updatedAt" | "createdAt" | "appliedOn" | "nextActionOn" | "company" | "status";
+/**
+ * "default" isn't a real column — it's the triage order (the old "Bookmark"
+ * toggle's sort): starred+high first, then high, then starred+low, then low,
+ * oldest posting first within each tier. See buildSortSpec.
+ */
+export type SortKey = "updatedAt" | "createdAt" | "appliedOn" | "nextActionOn" | "company" | "status" | "default";
 
 export type FilterState = {
   q: string;
@@ -33,7 +38,15 @@ export const EMPTY_FILTERS: FilterState = {
   dir: "desc",
 };
 
-const SORT_KEYS: SortKey[] = ["updatedAt", "createdAt", "appliedOn", "nextActionOn", "company", "status"];
+const SORT_KEYS: SortKey[] = [
+  "updatedAt",
+  "createdAt",
+  "appliedOn",
+  "nextActionOn",
+  "company",
+  "status",
+  "default",
+];
 
 type ParamSource = { get(key: string): string | null };
 
@@ -143,6 +156,89 @@ export function buildMongoFilter(f: FilterState, now: Date = new Date()): Record
   return and.length ? { $and: and } : {};
 }
 
-export function buildMongoSort(f: FilterState): Record<string, 1 | -1> {
-  return { [f.sort]: f.dir === "asc" ? 1 : -1 };
+export type SortField = { field: string; dir: 1 | -1 };
+
+/**
+ * The ordered list of (field, direction) pairs a sort resolves to. Usually
+ * just the chosen column, but "default" is itself a compound key — priority
+ * ascending ("high" sorts before "low" alphabetically, conveniently), starred
+ * descending (starred first within a tier), then posting date ascending.
+ */
+export function buildSortSpec(f: FilterState): SortField[] {
+  if (f.sort === "default") {
+    return [
+      { field: "priority", dir: 1 },
+      { field: "starred", dir: -1 },
+      { field: "createdAt", dir: 1 },
+    ];
+  }
+  return [{ field: f.sort, dir: f.dir === "asc" ? 1 : -1 }];
 }
+
+export function buildMongoSort(f: FilterState): Record<string, 1 | -1> {
+  return Object.fromEntries(buildSortSpec(f).map(({ field, dir }) => [field, dir]));
+}
+
+/**
+ * A cursor for keyset pagination: the previous page's last row, as the value
+ * of every field in the current sort spec (in order) plus its `_id` — the
+ * tuple two rows can never fully share, even when every sort field ties.
+ * `id` is generic rather than `string` so a caller with driver access can
+ * hand in an actual ObjectId; this module stays free of the `mongodb` import
+ * either way, and `values` stay as whatever JSON-safe type the field is
+ * (string, boolean, …) rather than being coerced to strings, since comparing
+ * a coerced string against a differently-typed field (e.g. a boolean) would
+ * silently match nothing — Mongo compares by BSON type before value.
+ */
+export type Cursor<Id = string> = { values: unknown[]; id: Id };
+
+/**
+ * The query clause for "everything after this cursor" in the current sort
+ * order. For a single-field sort this is the familiar two-clause `$or`
+ * (strictly past the value, or tied on it and past the `_id`); a compound
+ * sort (see buildSortSpec) generalizes that to one clause per field — each
+ * pinning every higher-priority field equal and requiring strict progress on
+ * that one — plus a final clause for every field tied, broken by `_id`.
+ * Combine with `combineMongoFilters`.
+ *
+ * Keyset pagination (as opposed to `skip`/`limit`) keeps each page's query
+ * cost independent of how far into the list it is — `skip` makes Mongo walk
+ * and discard every earlier row first, which gets slower the deeper you
+ * page. That matters once the collection is large enough that "just fetch
+ * everything" (the previous approach here) is no longer an option.
+ */
+export function buildCursorFilter<Id>(f: FilterState, cursor: Cursor<Id> | null): Record<string, unknown> | null {
+  if (!cursor) return null;
+  const spec = buildSortSpec(f);
+
+  const clauses: Record<string, unknown>[] = spec.map((_, i) => {
+    const clause: Record<string, unknown> = {};
+    for (let j = 0; j < i; j++) clause[spec[j].field] = cursor.values[j];
+    const { field, dir } = spec[i];
+    clause[field] = { [dir === 1 ? "$gt" : "$lt"]: cursor.values[i] };
+    return clause;
+  });
+
+  // Every sort field tied: the final tiebreak is `_id`, in the same
+  // direction as the last (least-significant) sort field.
+  const allTied: Record<string, unknown> = {};
+  spec.forEach(({ field }, i) => {
+    allTied[field] = cursor.values[i];
+  });
+  const lastDir = spec[spec.length - 1].dir;
+  allTied._id = { [lastDir === 1 ? "$gt" : "$lt"]: cursor.id };
+  clauses.push(allTied);
+
+  return { $or: clauses };
+}
+
+/** ANDs together whichever of these filter fragments are non-empty. */
+export function combineMongoFilters(...clauses: (Record<string, unknown> | null)[]): Record<string, unknown> {
+  const present = clauses.filter((c): c is Record<string, unknown> => c !== null && Object.keys(c).length > 0);
+  if (present.length === 0) return {};
+  if (present.length === 1) return present[0];
+  return { $and: present };
+}
+
+/** Page size for every paginated fetch of applications — one source of truth. */
+export const PAGE_SIZE = 200;

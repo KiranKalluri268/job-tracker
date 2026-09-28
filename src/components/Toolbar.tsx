@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { activeFilterCount, toSearchParams, type FilterState } from "@/lib/filters";
+import { EMPTY_FILTERS, activeFilterCount, toSearchParams, type FilterState } from "@/lib/filters";
 
 import FilterPanel from "./FilterPanel";
 import { Spinner, buttonClass, inputClass, primaryButtonClass } from "./ui";
@@ -56,6 +56,13 @@ export default function Toolbar({ filters, onChange, onAdd, refreshing }: Toolba
   }, [panelOpen]);
 
   const exportHref = `/api/applications/export?${toSearchParams(filters).toString()}`;
+  const defaultSort = filters.sort === "default";
+  const toggleDefaultSort = () =>
+    onChange(
+      defaultSort
+        ? { ...filters, sort: EMPTY_FILTERS.sort, dir: EMPTY_FILTERS.dir }
+        : { ...filters, sort: "default", dir: "asc" },
+    );
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -98,6 +105,20 @@ export default function Toolbar({ filters, onChange, onAdd, refreshing }: Toolba
           />
         ) : null}
       </div>
+
+      <button
+        type="button"
+        onClick={toggleDefaultSort}
+        aria-pressed={defaultSort}
+        title="Sort by triage order: starred+high first, then high, then starred+low, then low, oldest posting first within each tier"
+        className={
+          defaultSort
+            ? "inline-flex items-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/15 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-500/20"
+            : buttonClass
+        }
+      >
+        Default
+      </button>
 
       {/* A plain link so the browser handles the download and the CSV inherits the
           current filters straight from the URL. */}

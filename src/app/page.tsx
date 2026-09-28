@@ -2,20 +2,25 @@ import { Suspense } from "react";
 
 import { AUTH_DISABLED, auth, signOut } from "@/auth";
 import AppShell from "@/components/AppShell";
-import { buildMongoFilter, buildMongoSort, parseFilters } from "@/lib/filters";
+import { parseFilters, type Cursor } from "@/lib/filters";
 import { applications } from "@/lib/mongodb";
-import { serialize } from "@/lib/serialize";
+import { fetchApplicationPage } from "@/lib/pagination";
 import type { Application } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 /**
  * The first page load reads Mongo directly rather than fetching its own API route —
- * one round trip instead of two, and the table is populated in the HTML.
+ * one round trip instead of two, and the table is populated in the HTML. Only the
+ * first page's worth, though — the rest is filled in client-side, page by page, via
+ * the same keyset cursor the API route uses (see AppShell).
  */
-async function loadInitial(
-  params: Record<string, string | string[] | undefined>,
-): Promise<{ apps: Application[]; error: string | null; serverNow: number }> {
+async function loadInitial(params: Record<string, string | string[] | undefined>): Promise<{
+  apps: Application[];
+  cursor: Cursor<string> | null;
+  error: string | null;
+  serverNow: number;
+}> {
   // Read here rather than in the JSX: the client needs the same instant the HTML was
   // rendered at, and calling Date.now() during render is impure.
   const serverNow = Date.now();
@@ -26,16 +31,13 @@ async function loadInitial(
     }
     const filters = parseFilters(search);
     const col = await applications();
-    const docs = await col
-      .find(buildMongoFilter(filters))
-      .sort(buildMongoSort(filters))
-      .limit(1000)
-      .toArray();
-    return { apps: docs.map(serialize), error: null, serverNow };
+    const { applications: apps, nextCursor } = await fetchApplicationPage(col, filters, null);
+    return { apps, cursor: nextCursor, error: null, serverNow };
   } catch (error) {
     // A missing or wrong MONGODB_URI shows up as a banner, not a crashed page.
     return {
       apps: [],
+      cursor: null,
       error: error instanceof Error ? error.message : "Could not reach the database",
       serverNow,
     };
@@ -72,7 +74,7 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [session, { apps, error, serverNow }] = await Promise.all([
+  const [session, { apps, cursor, error, serverNow }] = await Promise.all([
     safeAuth(),
     loadInitial(await searchParams),
   ]);
@@ -86,6 +88,7 @@ export default async function Page({
     <Suspense fallback={null}>
       <AppShell
         initialApplications={apps}
+        initialCursor={cursor}
         initialError={error}
         userEmail={session?.user?.email ?? null}
         canEdit={canEdit}

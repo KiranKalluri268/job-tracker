@@ -1,5 +1,6 @@
 export const STATUSES = [
   "Saved",
+  "Opened",
   "Applied",
   "OA",
   "Interview",
@@ -17,8 +18,14 @@ export type Status = (typeof STATUSES)[number];
 export const WORK_MODES = ["Remote", "Hybrid", "Onsite"] as const;
 export type WorkMode = (typeof WORK_MODES)[number];
 
+export const PRIORITIES = ["high", "low"] as const;
+export type Priority = (typeof PRIORITIES)[number];
+
 /** Statuses that mean the company came back to us in some form. */
 export const RESPONDED: readonly Status[] = ["OA", "Interview", "Offer", "Rejected", "Not qualified"];
+
+/** Statuses that mean an application hasn't gone out yet — still in the triage queue. */
+export const NOT_YET_APPLIED: readonly Status[] = ["Saved", "Opened"];
 
 /** Statuses that mean the application is finished, one way or the other. */
 export const CLOSED: readonly Status[] = [
@@ -43,6 +50,7 @@ export type Application = {
   company: string;
   role: string;
   status: Status;
+  priority: Priority;
   starred: boolean;
   appliedOn: string | null;
   nextActionOn: string | null;
@@ -67,6 +75,7 @@ export type ApplicationInput = Partial<Omit<Application, "_id" | "events" | "cre
 
 export const STATUS_TONE: Record<Status, string> = {
   Saved: "bg-slate-500/12 text-slate-700 ring-slate-500/25",
+  Opened: "bg-sky-500/12 text-sky-700 ring-sky-500/25",
   Applied: "bg-indigo-500/12 text-indigo-700 ring-indigo-500/25",
   OA: "bg-violet-500/12 text-violet-700 ring-violet-500/25",
   Interview: "bg-amber-500/15 text-amber-800 ring-amber-500/30",
@@ -79,8 +88,26 @@ export const STATUS_TONE: Record<Status, string> = {
   "Broken link": "bg-neutral-500/12 text-neutral-600 ring-neutral-500/25",
 };
 
+export const PRIORITY_TONE: Record<Priority, string> = {
+  high: "bg-rose-500/12 text-rose-700 ring-rose-500/25",
+  low: "bg-slate-500/12 text-slate-600 ring-slate-500/25",
+};
+
+/**
+ * Default sort bucket: starred+high first, then high, then starred+low, then
+ * everything else (plain low). Lower rank sorts first.
+ */
+export function priorityRank(app: { starred: boolean; priority: Priority }): number {
+  if (app.priority === "high") return app.starred ? 0 : 1;
+  return app.starred ? 2 : 3;
+}
+
 export function isStatus(value: unknown): value is Status {
   return typeof value === "string" && (STATUSES as readonly string[]).includes(value);
+}
+
+export function isPriority(value: unknown): value is Priority {
+  return typeof value === "string" && (PRIORITIES as readonly string[]).includes(value);
 }
 
 export function isWorkMode(value: unknown): value is WorkMode {

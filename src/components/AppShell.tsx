@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { parseFilters, toSearchParams, type FilterState, type SortKey } from "@/lib/filters";
-import type { Application, Status } from "@/lib/types";
+import { parseFilters, toSearchParams, type Cursor, type FilterState, type SortKey } from "@/lib/filters";
+import type { Application, Priority, Status } from "@/lib/types";
 
 import { draftOf, payloadOf } from "./applicationDraft";
 import ApplicationModal from "./ApplicationModal";
@@ -18,6 +18,8 @@ import { useNow } from "./useNow";
 
 export type AppShellProps = {
   initialApplications: Application[];
+  /** Keyset cursor for the row after the server's first page, or null if that page was everything. */
+  initialCursor: Cursor<string> | null;
   initialError: string | null;
   userEmail: string | null;
   /** Admins get the editing controls; viewers get a read-only table. */
@@ -28,16 +30,26 @@ export type AppShellProps = {
   serverNow: number;
 };
 
-/** Every application, ignoring the current filters. */
-async function fetchAll(): Promise<Application[]> {
-  const res = await fetch("/api/applications");
+type Page = { list: Application[]; nextCursor: Cursor<string> | null };
+
+/** One page of applications matching `query` (a URL search-param string), starting after `cursor`. */
+async function fetchPage(query: string, cursor: Cursor<string> | null): Promise<Page> {
+  const qs = new URLSearchParams(query);
+  if (cursor) qs.set("cursor", JSON.stringify(cursor));
+  const res = await fetch(`/api/applications?${qs.toString()}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error ?? "Could not load applications");
-  return json.applications as Application[];
+  return { list: json.applications as Application[], nextCursor: (json.nextCursor as Cursor<string>) ?? null };
+}
+
+/** One page of every application, ignoring the current filters, starting after `cursor`. */
+function fetchAllPage(cursor: Cursor<string> | null): Promise<Page> {
+  return fetchPage("", cursor);
 }
 
 export default function AppShell({
   initialApplications,
+  initialCursor,
   initialError,
   userEmail,
   canEdit,
@@ -51,9 +63,12 @@ export default function AppShell({
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
 
   const [apps, setApps] = useState<Application[]>(initialApplications);
+  const [cursor, setCursor] = useState<Cursor<string> | null>(initialCursor);
   // The strip and the overview answer "how is the search going overall", which the
-  // current filter must not distort — so they read an unfiltered copy.
+  // current filter must not distort — so they read an unfiltered copy, fetched and
+  // paginated independently of the (possibly filtered) table above.
   const [allApps, setAllApps] = useState<Application[]>(initialApplications);
+  const [allCursor, setAllCursor] = useState<Cursor<string> | null>(null);
   const [error, setError] = useState<string | null>(initialError);
   const [refreshing, setRefreshing] = useState(false);
   // The create form is still a modal; editing an existing row happens inline in the
@@ -92,15 +107,11 @@ export default function AppShell({
     }
     const id = ++requestId.current;
     setRefreshing(true);
-    fetch(`/api/applications?${query}`)
-      .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Could not load applications");
-        return json.applications as Application[];
-      })
-      .then((list) => {
+    fetchPage(query, null)
+      .then(({ list, nextCursor }) => {
         if (id !== requestId.current) return;
         setApps(list);
+        setCursor(nextCursor);
         setError(null);
       })
       .catch((err: unknown) => {
@@ -112,13 +123,75 @@ export default function AppShell({
       });
   }, [query]);
 
+  // Keeps pulling pages in the background — via the keyset cursor, not
+  // skip/limit, so each fetch's cost doesn't grow with how far in it is —
+  // until the server says there's nothing left. No "Load more" button: the
+  // whole filtered set fills in on its own once the fast first page has
+  // painted. Guarded by a ref rather than a piece of state, since putting a
+  // "currently loading" flag in this effect's own dependency array made
+  // setting it re-run the effect immediately, before the fetch it started
+  // could resolve.
+  const loadingMoreRef = useRef(false);
+  useEffect(() => {
+    if (!cursor || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    fetchPage(query, cursor)
+      .then(({ list, nextCursor }) => {
+        setApps((prev) => [...prev, ...list]);
+        setCursor(nextCursor);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Could not load applications");
+        setCursor(null);
+      })
+      .finally(() => {
+        loadingMoreRef.current = false;
+      });
+  }, [cursor, query]);
+
+  // The unfiltered stats set walks the whole collection independently, always
+  // starting over from cursor=null — the SSR page's initialApplications may
+  // be a filtered first page (if the URL carries filters), so it can't be
+  // trusted as this set's seed.
+  const loadingAllRef = useRef(false);
   const reloadAll = useCallback(() => {
-    fetchAll()
-      .then(setAllApps)
+    if (loadingAllRef.current) return;
+    loadingAllRef.current = true;
+    fetchAllPage(null)
+      .then(({ list, nextCursor }) => {
+        setAllApps(list);
+        setAllCursor(nextCursor);
+      })
       .catch(() => {
         /* The filtered list already surfaces load failures; don't double-report. */
+      })
+      .finally(() => {
+        loadingAllRef.current = false;
       });
   }, []);
+
+  const allStarted = useRef(false);
+  useEffect(() => {
+    if (allStarted.current) return;
+    allStarted.current = true;
+    reloadAll();
+  }, [reloadAll]);
+
+  useEffect(() => {
+    if (!allCursor || loadingAllRef.current) return;
+    loadingAllRef.current = true;
+    fetchAllPage(allCursor)
+      .then(({ list, nextCursor }) => {
+        setAllApps((prev) => [...prev, ...list]);
+        setAllCursor(nextCursor);
+      })
+      .catch(() => {
+        setAllCursor(null);
+      })
+      .finally(() => {
+        loadingAllRef.current = false;
+      });
+  }, [allCursor]);
 
   const applyFilters = useCallback(
     (next: FilterState) => {
@@ -336,6 +409,30 @@ export default function AppShell({
     [patchApp, pushHistory, addToast, undoToastAction],
   );
 
+  // Inline priority switch from the table. Optimistic, reconciled against the
+  // server response, rolled back on failure, and undoable, same as status.
+  const onPriorityChange = useCallback(
+    (app: Application, priority: Priority) => {
+      const opt = (p: Priority) => (a: Application) => ({ ...a, priority: p });
+      patchApp(app._id, { priority }, opt(priority))
+        .then(() => {
+          pushHistory({
+            label: "priority change",
+            undo: () => patchApp(app._id, { priority: app.priority }, opt(app.priority)),
+            redo: () => patchApp(app._id, { priority }, opt(priority)),
+          });
+          addToast(`Priority set to ${priority}`, {
+            source: `priority:${app._id}`,
+            action: undoToastAction,
+          });
+        })
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : "Could not update application");
+        });
+    },
+    [patchApp, pushHistory, addToast, undoToastAction],
+  );
+
   // Inline edit-save from the expanded row. RowDetail has already written the row;
   // here we merge it and record an undo that PATCHes every field back to how it
   // was, with redo re-applying the saved values.
@@ -446,6 +543,7 @@ export default function AppShell({
           onApply={onQuickApply}
           onToggleStar={onToggleStar}
           onStatusChange={onStatusChange}
+          onPriorityChange={onPriorityChange}
           onStatusAdvance={onStatusAdvance}
           onRowSaved={onRowSaved}
           onRowDeleted={onDeleted}

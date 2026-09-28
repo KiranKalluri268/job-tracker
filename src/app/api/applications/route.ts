@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { assertCanEdit, errorResponse } from "@/lib/api";
-import { buildMongoFilter, buildMongoSort, parseFilters } from "@/lib/filters";
+import { parseFilters } from "@/lib/filters";
 import { applications } from "@/lib/mongodb";
+import { fetchApplicationPage } from "@/lib/pagination";
 import { newDocument, sanitizeInput, serialize } from "@/lib/serialize";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +12,12 @@ export async function GET(request: NextRequest) {
   try {
     const filters = parseFilters(request.nextUrl.searchParams);
     const col = await applications();
-    const docs = await col
-      .find(buildMongoFilter(filters))
-      .sort(buildMongoSort(filters))
-      .limit(1000)
-      .toArray();
-    return NextResponse.json({ applications: docs.map(serialize) });
+    const { applications: docs, nextCursor } = await fetchApplicationPage(
+      col,
+      filters,
+      request.nextUrl.searchParams.get("cursor"),
+    );
+    return NextResponse.json({ applications: docs, nextCursor });
   } catch (error) {
     return errorResponse(error);
   }

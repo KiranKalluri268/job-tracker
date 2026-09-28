@@ -1,7 +1,7 @@
 "use client";
 
-import type { Status } from "@/lib/types";
-import { STATUS_TONE } from "@/lib/types";
+import type { Priority, Status } from "@/lib/types";
+import { PRIORITY_TONE, STATUS_TONE } from "@/lib/types";
 
 export function StatusPill({ status }: { status: Status }) {
   return (
@@ -9,6 +9,16 @@ export function StatusPill({ status }: { status: Status }) {
       className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${STATUS_TONE[status]}`}
     >
       {status}
+    </span>
+  );
+}
+
+export function PriorityPill({ priority }: { priority: Priority }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ring-1 ring-inset ${PRIORITY_TONE[priority]}`}
+    >
+      {priority}
     </span>
   );
 }
